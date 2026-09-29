@@ -50,9 +50,6 @@ Ejemplo: SOS|Laura M.|NECESITO AYUDA. Quedamos atrapados en el piso 2
 
 ### Comandos:
 ```bash
-# Entrar al directorio
-cd radio_mesh
-
 # Obtener dependencias
 flutter pub get
 
