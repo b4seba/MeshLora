@@ -1,7 +1,7 @@
 class DeviceStatus {
   final int myNodeNum;
   final String nodeId;
-  final int batteryPercent;
+  final int _rawBatteryPercent;
   final double voltage;
   final bool isCharging;
   final int signalDbm;
@@ -21,7 +21,7 @@ class DeviceStatus {
   const DeviceStatus({
     this.myNodeNum = 0,
     this.nodeId = 'Sin vincular',
-    this.batteryPercent = 0,
+    int batteryPercent = 0,
     this.voltage = 0.0,
     this.isCharging = false,
     this.signalDbm = 0,
@@ -37,7 +37,18 @@ class DeviceStatus {
     this.isBleConnected = false,
     this.connectedDeviceName = '',
     this.connectedDeviceId = '',
-  });
+  }) : _rawBatteryPercent = batteryPercent;
+
+  /// Porcentaje de batería LiPo calculado estrictamente por voltaje (3.20V a 4.20V)
+  /// Solo marca 100% si el voltaje alcanza o supera los 4.20V reales.
+  int get batteryPercent {
+    if (voltage > 0.0) {
+      if (voltage >= 4.20) return 100;
+      if (voltage <= 3.20) return 0;
+      return ((voltage - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+    }
+    return (_rawBatteryPercent > 0 && _rawBatteryPercent < 100) ? _rawBatteryPercent : 0;
+  }
 
   DeviceStatus copyWith({
     int? myNodeNum,
@@ -62,7 +73,7 @@ class DeviceStatus {
     return DeviceStatus(
       myNodeNum: myNodeNum ?? this.myNodeNum,
       nodeId: nodeId ?? this.nodeId,
-      batteryPercent: batteryPercent ?? this.batteryPercent,
+      batteryPercent: batteryPercent ?? _rawBatteryPercent,
       voltage: voltage ?? this.voltage,
       isCharging: isCharging ?? this.isCharging,
       signalDbm: signalDbm ?? this.signalDbm,
@@ -82,10 +93,10 @@ class DeviceStatus {
   }
 
   String get batteryRemainingEstimated {
-    if (batteryPercent <= 0) return 'Conectando telemetría...';
+    if (voltage <= 0.0 && batteryPercent <= 0) return 'Esperando telemetría...';
     final hours = (batteryPercent * 0.28).round();
     return voltage > 0 
-        ? '$voltage V · Aprox. $hours horas restantes'
+        ? '${voltage.toStringAsFixed(2)} V · Aprox. $hours horas restantes'
         : 'Aprox. $hours horas restantes';
   }
 }

@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../services/ble_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/radio_icons.dart';
+import '../widgets/mesh_logo.dart';
 
 class PairingScreen extends StatefulWidget {
   const PairingScreen({super.key});
@@ -38,6 +41,7 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
   }
 
   Future<void> _handleConnect([dynamic deviceOrId]) async {
+    HapticFeedback.lightImpact();
     setState(() {
       _isConnecting = true;
       if (deviceOrId is DiscoveredRadioDevice) {
@@ -58,11 +62,12 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<MeshProvider>();
 
     if (provider.currentScreen == AppFlowScreen.pairedSuccess) {
       return Scaffold(
-        backgroundColor: AppTheme.lime,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: SafeArea(
           child: Center(
             child: Padding(
@@ -71,14 +76,14 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    width: 120,
-                    height: 120,
+                    width: 96,
+                    height: 96,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.onlineGreen,
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withAlpha(40),
+                          color: AppTheme.onlineGreen.withAlpha(80),
                           blurRadius: 24,
                           offset: const Offset(0, 8),
                         ),
@@ -86,33 +91,56 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
                     ),
                     child: const Icon(
                       Icons.check_rounded,
-                      size: 80,
-                      color: AppTheme.lime,
-                    ),
-                  ),
-                  const SizedBox(height: 36),
-                  const Text(
-                    '¡CONECTADO!',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 38,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Radio RAK4630 vinculada a la red LoRa 915 MHz',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
+                      size: 48,
                       color: Colors.white,
                     ),
-                  ),
+                  )
+                      .animate()
+                      .scale(begin: const Offset(0.7, 0.7), end: const Offset(1, 1), curve: Curves.easeOutBack)
+                      .fadeIn(duration: 300.ms),
+                  const Gap(28),
+                  Text(
+                    '¡Conectado!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                      letterSpacing: -0.6,
+                    ),
+                  ).animate().fadeIn(delay: 150.ms, duration: 300.ms),
+                  const Gap(8),
+                  Text(
+                    'Radio WisBlock vinculada a la red LoRa 915 MHz',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: isDark ? Colors.white.withAlpha(200) : AppTheme.textMuted,
+                    ),
+                  ).animate().fadeIn(delay: 250.ms, duration: 300.ms),
+                  const Gap(40),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        provider.completePairing();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.electricBlue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: const Text(
+                        'Continuar a Alerta Mesh',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ).animate().fadeIn(delay: 350.ms, duration: 300.ms).slideY(begin: 0.1, end: 0),
                 ],
               ),
             ),
@@ -125,77 +153,49 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
     final isScanning = provider.bleService.currentState == BleConnectionState.scanning;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(80),
-        child: Container(
-          color: AppTheme.navy,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(30),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.bluetooth_searching_rounded,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Text(
-                          'VINCULAR MI RADIO',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        Text(
-                          'Paso 1 de 2 · WisBlock RAK4630 LoRa',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white70,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (isScanning)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(AppTheme.lime),
-                      ),
-                    )
-                  else
-                    IconButton(
-                      onPressed: () => provider.startPairingScan(),
-                      icon: const Icon(Icons.refresh_rounded, color: Colors.white),
-                      tooltip: 'Reescanear radios',
-                    ),
-                ],
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Vincular Antena'),
+            Text(
+              'Paso 1 de 2 · WisBlock RAK4630 LoRa',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
               ),
             ),
-          ),
+          ],
+        ),
+        actions: [
+          if (isScanning)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.electricBlue),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                provider.startPairingScan();
+              },
+              icon: const Icon(Icons.refresh_rounded, size: 20),
+              tooltip: 'Reescanear radios',
+            ),
+          const Gap(4),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
         ),
       ),
       body: SafeArea(
@@ -204,100 +204,106 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () => provider.startPairingScan(),
-                color: AppTheme.navy,
-                backgroundColor: AppTheme.lime,
+                color: AppTheme.electricBlue,
+                backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: Column(
                     children: [
-                      // Ilustración visual Celular <-> Radio
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const PhoneVisualWidget(),
-                          const SizedBox(width: 14),
-                          _buildConnectionSignal(),
-                          const SizedBox(width: 14),
-                          RadioNodeVisualWidget(isActive: _isConnecting),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                      // Ilustración de Vinculación
+                      _buildVisualIllustration(isDark),
+                      const Gap(16),
 
                       // Tarjeta de Instrucción
                       Container(
                         width: double.infinity,
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          color: isDark ? AppTheme.obsidianCard : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
                         ),
-                        child: const Text(
-                          'Enciende tu antena RAK4630. Selecciónala en la lista de abajo para conectarte a la malla LoRa.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF2D3748),
-                            height: 1.35,
-                          ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 18, color: AppTheme.electricBlue),
+                            const Gap(10),
+                            Expanded(
+                              child: Text(
+                                'Enciende tu antena WisBlock. Selecciónala abajo para enlazar por Bluetooth.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const Gap(16),
 
                       // Sección de Radios Detectadas
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'RADIOS DETECTADAS (${discovered.length})',
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
+                            'Radios Detectadas (${discovered.length})',
+                            style: TextStyle(
                               fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                              color: AppTheme.navy,
-                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
                             ),
                           ),
-                          TextButton.icon(
-                            onPressed: () => provider.startPairingScan(),
-                            icon: const Icon(Icons.sync_rounded, size: 16, color: AppTheme.orange),
-                            label: Text(
-                              isScanning ? 'Escaneando...' : 'Reescanear',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppTheme.orange,
-                              ),
+                          GestureDetector(
+                            onTap: () {
+                              HapticFeedback.lightImpact();
+                              provider.startPairingScan();
+                            },
+                            child: Row(
+                              children: const [
+                                Icon(
+                                  Icons.refresh_rounded,
+                                  size: 14,
+                                  color: AppTheme.electricBlue,
+                                ),
+                                Gap(4),
+                                Text(
+                                  'Reescanear',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.electricBlue,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      const Gap(8),
 
                       if (discovered.isEmpty)
                         Container(
-                          padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                            color: isDark ? AppTheme.obsidianCard : Colors.white,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: const Color(0xFFEDF2F7)),
+                            border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
                           ),
                           child: Column(
-                            children: const [
-                              Icon(Icons.bluetooth_searching_rounded, size: 36, color: AppTheme.textMuted),
-                              SizedBox(height: 10),
+                            children: [
+                              Icon(Icons.bluetooth_searching_rounded, size: 36, color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
+                              const Gap(10),
                               Text(
                                 'Buscando dispositivos Bluetooth cercanos...\nDesliza hacia abajo para reescanear.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'Roboto',
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textMuted,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
                                 ),
                               ),
                             ],
@@ -307,98 +313,102 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
                         ...discovered.map((dev) {
                           final isThisConnecting = _isConnecting && _connectingDeviceId == dev.id;
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            shape: RoundedRectangleBorder(
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.obsidianCard : Colors.white,
                               borderRadius: BorderRadius.circular(16),
-                              side: BorderSide(
-                                color: dev.isLikelyRadio ? AppTheme.lime : const Color(0xFFE2E8F0),
-                                width: dev.isLikelyRadio ? 2 : 1,
+                              border: Border.all(
+                                color: dev.isLikelyRadio ? AppTheme.electricBlue : (isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                                width: dev.isLikelyRadio ? 1.5 : 1,
                               ),
                             ),
-                            child: ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              leading: Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color: dev.isLikelyRadio
-                                      ? AppTheme.lime.withAlpha(30)
-                                      : const Color(0xFFEDF2F7),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  dev.isLikelyRadio ? Icons.sensors_rounded : Icons.bluetooth_rounded,
-                                  color: dev.isLikelyRadio ? AppTheme.lime : const Color(0xFF718096),
-                                  size: 24,
-                                ),
-                              ),
-                              title: Text(
-                                dev.name,
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppTheme.textDark,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${dev.id} · Señal: ${dev.rssi} dBm',
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppTheme.textMuted,
-                                ),
-                              ),
-                              trailing: ElevatedButton(
-                                onPressed: _isConnecting ? null : () => _handleConnect(dev),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: dev.isLikelyRadio ? AppTheme.lime : AppTheme.navy,
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    color: dev.isLikelyRadio
+                                        ? (isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight)
+                                        : (isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9)),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Icon(
+                                    dev.isLikelyRadio ? Icons.cell_tower_rounded : Icons.bluetooth_rounded,
+                                    color: dev.isLikelyRadio ? AppTheme.electricBlue : (isDark ? AppTheme.textMutedDark : AppTheme.textMuted),
+                                    size: 20,
                                   ),
                                 ),
-                                child: isThisConnecting
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : const Text(
-                                        'CONECTAR',
+                                const Gap(12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        dev.name,
                                         style: TextStyle(
-                                          fontFamily: 'Roboto',
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w900,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
                                         ),
                                       ),
-                              ),
+                                      const Gap(2),
+                                      Text(
+                                        '${dev.id} · RSSI: ${dev.rssi} dBm',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const Gap(8),
+                                ElevatedButton(
+                                  onPressed: _isConnecting ? null : () => _handleConnect(dev),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: dev.isLikelyRadio ? AppTheme.electricBlue : (isDark ? AppTheme.obsidianElevated : AppTheme.obsidian),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                  ),
+                                  child: isThisConnecting
+                                      ? const SizedBox(
+                                          width: 14,
+                                          height: 14,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                          ),
+                                        )
+                                      : const Text('Conectar'),
+                                ),
+                              ],
                             ),
                           );
                         }),
-                      const SizedBox(height: 16),
+                      const Gap(16),
                     ],
                   ),
                 ),
               ),
             ),
 
-            // Botón Principal Inferior
+            // Botón Inferior
             Padding(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(16),
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: _isConnecting
                       ? null
                       : () {
-                          // Conectar a la primera radio detectada o modo automático
                           if (discovered.isNotEmpty) {
                             _handleConnect(discovered.first);
                           } else {
@@ -406,39 +416,33 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
                           }
                         },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isConnecting ? const Color(0xFF94A3B8) : AppTheme.navy,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    backgroundColor: _isConnecting ? const Color(0xFF94A3B8) : AppTheme.electricBlue,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(14),
                     ),
-                    elevation: _isConnecting ? 0 : 6,
-                    shadowColor: AppTheme.navy.withAlpha(100),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       if (_isConnecting) ...[
                         const SizedBox(
-                          width: 20,
-                          height: 20,
+                          width: 18,
+                          height: 18,
                           child: CircularProgressIndicator(
-                            strokeWidth: 2.5,
+                            strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const Gap(10),
                       ],
                       Text(
                         _isConnecting
-                            ? 'CONECTANDO...'
-                            : (discovered.isNotEmpty
-                                ? 'CONECTAR A MI RADIO'
-                                : 'VINCULAR MI RADIO'),
+                            ? 'Conectando...'
+                            : (discovered.isNotEmpty ? 'Conectar a mi Radio' : 'Buscar Radios'),
                         style: const TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.8,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
                       ),
@@ -453,36 +457,90 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildConnectionSignal() {
-    return AnimatedBuilder(
-      animation: _animController,
-      builder: (context, child) {
-        return Column(
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(3, (i) {
-                final isLit = _isConnecting;
-                return Container(
-                  width: 8,
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: isLit ? AppTheme.lime : const Color(0xFFCBD5E0),
-                    borderRadius: BorderRadius.circular(2),
+  Widget _buildVisualIllustration(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.obsidianCard : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Teléfono
+          Container(
+            width: 60,
+            height: 80,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle, width: 1.5),
+            ),
+            child: const Center(
+              child: MeshLogo(size: 28, borderRadius: 6),
+            ),
+          ),
+          const Gap(16),
+
+          // Señal de conexión animada
+          AnimatedBuilder(
+            animation: _animController,
+            builder: (context, child) {
+              return Column(
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(3, (i) {
+                      final isLit = _isConnecting;
+                      return Container(
+                        width: 6,
+                        height: 3,
+                        margin: const EdgeInsets.symmetric(horizontal: 2),
+                        decoration: BoxDecoration(
+                          color: isLit ? AppTheme.electricBlue : (isDark ? AppTheme.borderDark : const Color(0xFFCBD5E1)),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      );
+                    }),
                   ),
-                );
-              }),
+                  const Gap(4),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: _isConnecting ? AppTheme.electricBlue : (isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
+                  ),
+                ],
+              );
+            },
+          ),
+          const Gap(16),
+
+          // Antena WisBlock
+          Container(
+            width: 60,
+            height: 80,
+            decoration: BoxDecoration(
+              color: _isConnecting
+                  ? (isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight)
+                  : (isDark ? AppTheme.obsidianElevated : const Color(0xFFF8FAFC)),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _isConnecting ? AppTheme.electricBlue : (isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                width: 1.5,
+              ),
             ),
-            const SizedBox(height: 6),
-            Icon(
-              Icons.arrow_forward_rounded,
-              size: 26,
-              color: _isConnecting ? AppTheme.lime : const Color(0xFFA0AEC0),
+            child: Center(
+              child: Icon(
+                Icons.cell_tower_rounded,
+                size: 28,
+                color: _isConnecting ? AppTheme.electricBlue : (isDark ? AppTheme.textMutedDark : AppTheme.textMuted),
+              ),
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }
+

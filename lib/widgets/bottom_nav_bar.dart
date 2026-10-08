@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../theme/app_theme.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
@@ -13,92 +14,114 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: const Border(
-          top: BorderSide(color: Color(0xFFEDF2F7), width: 1.5),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.obsidianCard : Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle,
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withAlpha(isDark ? 30 : 10),
+              blurRadius: 20,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(8),
-            blurRadius: 10,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 64,
-          child: Row(
-            children: [
-              _buildNavItem(
-                index: 0,
-                label: 'Mensajes',
-                icon: Icons.chat_bubble_rounded,
-              ),
-              _buildNavItem(
-                index: 1,
-                label: 'Vecinos',
-                icon: Icons.people_alt_rounded,
-              ),
-              _buildNavItem(
-                index: 2,
-                label: 'Estado',
-                icon: Icons.sensors_rounded,
-              ),
-            ],
-          ),
+        child: Row(
+          children: [
+            _buildNavItem(
+              context: context,
+              index: 0,
+              label: 'Mensajes',
+              icon: Icons.chat_bubble_outline_rounded,
+              activeIcon: Icons.chat_bubble_rounded,
+            ),
+            const SizedBox(width: 6),
+            _buildNavItem(
+              context: context,
+              index: 1,
+              label: 'Vecinos',
+              icon: Icons.people_outline_rounded,
+              activeIcon: Icons.people_rounded,
+            ),
+            const SizedBox(width: 6),
+            _buildNavItem(
+              context: context,
+              index: 2,
+              label: 'Estado',
+              icon: Icons.sensors_rounded,
+              activeIcon: Icons.sensors_rounded,
+            ),
+          ],
         ),
       ),
     );
   }
 
   Widget _buildNavItem({
+    required BuildContext context,
     required int index,
     required String label,
     required IconData icon,
+    required IconData activeIcon,
   }) {
     final isActive = activeIndex == index;
-    final color = isActive ? AppTheme.orange : const Color(0xFFA0AEC0);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Expanded(
-      child: InkWell(
-        onTap: () => onTabSelected(index),
-        splashColor: AppTheme.orange.withAlpha(20),
-        highlightColor: Colors.transparent,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 24,
-              color: color,
-            ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w900 : FontWeight.w700,
-                color: color,
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTabSelected(index);
+        },
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive
+                ? (isDark
+                    ? AppTheme.electricBlue.withAlpha(45)
+                    : AppTheme.electricBlueLight)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isActive ? activeIcon : icon,
+                size: 22,
+                color: isActive
+                    ? AppTheme.electricBlue
+                    : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
               ),
-            ),
-            const SizedBox(height: 2),
-            if (isActive)
-              Container(
-                width: 6,
-                height: 6,
-                decoration: const BoxDecoration(
-                  color: AppTheme.orange,
-                  shape: BoxShape.circle,
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                  color: isActive
+                      ? AppTheme.electricBlue
+                      : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
+                  letterSpacing: -0.2,
                 ),
-              )
-            else
-              const SizedBox(height: 6),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );

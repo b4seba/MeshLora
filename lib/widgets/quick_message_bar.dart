@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:gap/gap.dart';
 import '../theme/app_theme.dart';
 
 class QuickMessageBar extends StatelessWidget {
@@ -11,75 +13,108 @@ class QuickMessageBar extends StatelessWidget {
 
   static const List<Map<String, dynamic>> _quickItems = [
     {
-      'text': '¡ESTOY BIEN!',
-      'color': AppTheme.lime,
+      'text': '¡Estoy bien!',
+      'color': AppTheme.onlineGreen,
+      'bg': AppTheme.onlineGreenLight,
+      'icon': Icons.check_circle_outline_rounded,
       'isUrgent': false,
     },
     {
-      'text': 'NECESITO AYUDA',
+      'text': 'Necesito ayuda',
       'color': AppTheme.redAlert,
+      'bg': AppTheme.redAlertLight,
+      'icon': Icons.warning_amber_rounded,
       'isUrgent': true,
     },
     {
-      'text': '¿DÓNDE ESTÁN?',
-      'color': AppTheme.navy,
+      'text': '¿Dónde están?',
+      'color': AppTheme.obsidian,
+      'bg': Color(0xFFF1F5F9),
+      'icon': Icons.help_outline_rounded,
       'isUrgent': false,
     },
     {
-      'text': 'PUNTO DE ENCUENTRO',
-      'color': Color(0xFFF39C12),
+      'text': 'Punto de encuentro',
+      'color': Color(0xFFD97706),
+      'bg': Color(0xFFFFFBEB),
+      'icon': Icons.place_rounded,
       'isUrgent': false,
     },
     {
-      'text': 'HAY AGUA DISPONIBLE',
-      'color': Color(0xFF3498DB),
+      'text': 'Hay agua disponible',
+      'color': AppTheme.electricBlue,
+      'bg': AppTheme.electricBlueLight,
+      'icon': Icons.water_drop_outlined,
       'isUrgent': false,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return SizedBox(
-      height: 48,
+      height: 38,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: _quickItems.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const Gap(8),
         itemBuilder: (context, index) {
           final item = _quickItems[index];
           final text = item['text'] as String;
-          final color = item['color'] as Color;
+          Color color = item['color'] as Color;
+          Color bg = item['bg'] as Color;
+          final icon = item['icon'] as IconData;
+
+          if (isDark) {
+            if (color == AppTheme.obsidian) {
+              color = AppTheme.textPrimaryDark;
+              bg = AppTheme.obsidianCard;
+            } else if (color == AppTheme.onlineGreen) {
+              bg = AppTheme.onlineGreen.withAlpha(35);
+            } else if (color == AppTheme.redAlert) {
+              bg = AppTheme.redAlert.withAlpha(35);
+            } else if (color == AppTheme.electricBlue) {
+              bg = AppTheme.electricBlue.withAlpha(35);
+            } else {
+              bg = const Color(0xFFD97706).withAlpha(35);
+            }
+          }
 
           return Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => onQuickMessageTapped(text),
-              borderRadius: BorderRadius.circular(14),
-              child: Ink(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              onTap: () {
+                HapticFeedback.lightImpact();
+                onQuickMessageTapped(text);
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      color: color.withAlpha(80),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+                  color: bg,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? color.withAlpha(90) : color.withAlpha(50),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: color),
+                    const Gap(6),
+                    Text(
+                      text,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: color,
+                        letterSpacing: -0.1,
+                      ),
                     ),
                   ],
-                ),
-                child: Center(
-                  child: Text(
-                    text,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
                 ),
               ),
             ),
@@ -89,3 +124,4 @@ class QuickMessageBar extends StatelessWidget {
     );
   }
 }
+

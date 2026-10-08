@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/emergency_guide_sheet.dart';
-import '../widgets/radio_icons.dart';
+import '../widgets/mesh_logo.dart';
 import 'logs_screen.dart';
 
 class StatusScreen extends StatelessWidget {
@@ -15,650 +18,1026 @@ class StatusScreen extends StatelessWidget {
     final status = provider.deviceStatus;
     final battery = status.batteryPercent;
     final isBleConnected = status.isBleConnected;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(74),
-        child: Container(
-          color: AppTheme.navy,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'ESTADO DEL DISPOSITIVO',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          isBleConnected
-                              ? '${status.connectedDeviceName} · Enlace BLE Activo'
-                              : 'WisBlock RAK4630 · Desconectado',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withAlpha(160),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Recargar Estado de Radio',
-                    onPressed: () async {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Actualizando telemetría y estado de la radio...'),
-                          duration: Duration(milliseconds: 900),
-                          backgroundColor: AppTheme.navy,
-                        ),
-                      );
-                      await provider.refreshAllData();
-                    },
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.refresh_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Consola de Logs',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LogsScreen()),
-                      );
-                    },
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.terminal_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () => provider.refreshAllData(),
-        color: AppTheme.navy,
-        backgroundColor: AppTheme.lime,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(20),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        toolbarHeight: 68,
+        titleSpacing: 16,
+        elevation: 0,
+        backgroundColor: isDark ? AppTheme.obsidian : Colors.white,
+        title: Row(
           children: [
-          // 1. Tarjeta de Batería Real
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+            const MeshLogo(
+              height: 38,
+              fit: BoxFit.contain,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppTheme.lime.withAlpha(35),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.battery_charging_full_rounded,
-                        color: AppTheme.lime,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Text(
-                      'BATERÍA DE LA RADIO',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF4A5568),
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      battery > 0 ? '$battery%' : '--',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: battery > 25 ? AppTheme.lime : AppTheme.orange,
-                        height: 1.0,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Text(
-                        status.batteryRemainingEstimated,
-                        style: const TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.textMuted,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: (battery / 100).clamp(0.0, 1.0),
-                    minHeight: 14,
-                    backgroundColor: const Color(0xFFEDF2F7),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      battery > 25 ? AppTheme.lime : AppTheme.orange,
+            const Gap(12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Estado del Dispositivo',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 2. Tarjeta Señal de Radio LoRa Real
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.lime.withAlpha(30),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const RadioTowerIcon(size: 24, color: AppTheme.lime),
+                  const Gap(2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: isBleConnected ? AppTheme.onlineGreen : (isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
+                          shape: BoxShape.circle,
+                          boxShadow: isBleConnected
+                              ? [
+                                  BoxShadow(
+                                    color: AppTheme.onlineGreen.withAlpha(100),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
                         ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'SEÑAL DE RADIO',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: AppTheme.textDark,
-                              ),
-                            ),
-                            Text(
-                              'Frecuencia ${status.frequencyMhz.toStringAsFixed(0)} MHz (SUBTEL Chile)',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                                color: AppTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        Container(
-                          width: 10,
-                          height: 10,
-                          decoration: BoxDecoration(
-                            color: isBleConnected ? AppTheme.lime : const Color(0xFFA0AEC0),
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          isBleConnected ? 'ACTIVA' : 'DESCONECTADA',
+                      ),
+                      const Gap(6),
+                      Flexible(
+                        child: Text(
+                          isBleConnected
+                              ? '${status.connectedDeviceName.isNotEmpty ? status.connectedDeviceName : "WisBlock RAK4630"} · BLE Activo'
+                              : 'WisBlock RAK4630 · Desconectado',
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w900,
-                            color: isBleConnected ? const Color(0xFF276749) : const Color(0xFFA0AEC0),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    _buildMetricBox(
-                      'Último RSSI',
-                      status.signalDbm != 0 ? '${status.signalDbm} dBm' : '--',
-                      isOk: status.signalDbm != 0,
-                    ),
-                    const SizedBox(width: 10),
-                    _buildMetricBox(
-                      'Nodos Malla',
-                      '${status.activeNodesCount}',
-                      isOk: status.activeNodesCount > 0,
-                    ),
-                    const SizedBox(width: 10),
-                    _buildMetricBox(
-                      'Mensajes',
-                      '${status.totalMessagesTransmitted}',
-                      isOk: true,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 3. Tarjeta de Información del Hardware
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withAlpha(10),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'INFORMACIÓN DEL NODO',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF4A5568),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _buildInfoRow('Modelo', status.hardwareModel),
-                _buildInfoRow('ID del Nodo (Hex)', status.nodeId),
-                _buildInfoRow('Número de Nodo', status.myNodeNum != 0 ? '${status.myNodeNum}' : '--'),
-                _buildInfoRow('Versión Firmware', status.firmwareVersion),
-                _buildInfoRow(
-                  'Nombre de Usuario',
-                  provider.userName,
-                  onTap: () => _showEditNameDialog(context),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.navy.withAlpha(20),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.edit_rounded, size: 12, color: AppTheme.navy),
-                        SizedBox(width: 4),
-                        Text(
-                          'Editar',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
                             fontSize: 11,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.navy,
+                            fontWeight: FontWeight.w600,
+                            color: isBleConnected ? AppTheme.onlineGreen : (isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
                           ),
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Tooltip(
+            message: 'Sincronizar Telemetría',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Actualizando telemetría y estado de la radio...'),
+                      duration: Duration(milliseconds: 900),
+                      backgroundColor: AppTheme.obsidian,
+                    ),
+                  );
+                  await provider.refreshAllData();
+                },
+                borderRadius: BorderRadius.circular(11),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0),
+                      width: 1,
                     ),
                   ),
+                  child: Icon(
+                    Icons.refresh_rounded,
+                    size: 20,
+                    color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                  ),
                 ),
-                _buildInfoRow('Dispositivo BLE', status.connectedDeviceName.isNotEmpty ? status.connectedDeviceName : 'Sin conexión', isLast: true),
-              ],
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Botón Desconectar / Conectar Antena BLE
-          if (isBleConnected)
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: Colors.white,
-                border: Border.all(color: const Color(0xFFFEB2B2), width: 1.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.redAlert.withAlpha(15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => _showDisconnectDialog(context),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.bluetooth_disabled_rounded, color: AppTheme.redAlert, size: 22),
-                        SizedBox(width: 10),
-                        Text(
-                          'DESCONECTAR ANTENA',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.redAlert,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            )
-          else
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                color: AppTheme.navy,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.navy.withAlpha(50),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => provider.startPairingScan(),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: const [
-                        Icon(Icons.bluetooth_searching_rounded, color: Colors.white, size: 22),
-                        SizedBox(width: 10),
-                        Text(
-                          'VINCULAR / CONECTAR ANTENA',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 20),
-
-          // Botón Consola de Logs en Vivo
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              color: AppTheme.navy,
-              boxShadow: [
-                BoxShadow(
-                  color: AppTheme.navy.withAlpha(50),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+          const Gap(6),
+          Tooltip(
+            message: 'Consola de Logs',
             child: Material(
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
+                  HapticFeedback.lightImpact();
                   Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const LogsScreen()),
                   );
                 },
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-                  child: Row(
+                borderRadius: BorderRadius.circular(11),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.terminal_rounded,
+                    size: 20,
+                    color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const Gap(14),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            color: isDark ? AppTheme.obsidianBorder : const Color(0xFFE2E8F0),
+          ),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: () => provider.refreshAllData(),
+        color: AppTheme.electricBlue,
+        backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(16),
+          children: [
+            // 1. Tarjeta de Batería de la Radio
+            _buildCard(
+              context: context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF00E676).withAlpha(30),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.terminal_rounded, color: Color(0xFF00E676), size: 24),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.battery_charging_full_rounded,
+                              color: AppTheme.onlineGreen,
+                              size: 20,
+                            ),
+                          ),
+                          const Gap(10),
+                          Text(
+                            'Batería de la Radio',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : AppTheme.textDark,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: (battery > 20)
+                              ? (isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight)
+                              : (isDark ? AppTheme.redAlert.withAlpha(40) : AppTheme.redAlertLight),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          status.voltage > 0
+                              ? '${status.voltage.toStringAsFixed(2)} V'
+                              : (battery > 0 ? '$battery%' : '--'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: (battery > 20) ? AppTheme.onlineGreen : AppTheme.redAlert,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(16),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        battery > 0 ? '$battery%' : (status.voltage > 0 ? '${status.voltage.toStringAsFixed(2)}V' : '--'),
+                        style: TextStyle(
+                          fontSize: 40,
+                          fontWeight: FontWeight.w800,
+                          color: isDark ? Colors.white : AppTheme.textDark,
+                          letterSpacing: -1.0,
+                          height: 1.0,
+                        ),
+                      ),
+                      const Gap(12),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
-                            Text(
-                              'CONSOLA DE LOGS EN VIVO',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w900,
-                                color: Colors.white,
-                                letterSpacing: 0.3,
+                        child: Text(
+                          status.batteryRemainingEstimated,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Gap(16),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: battery > 0
+                          ? (battery / 100).clamp(0.0, 1.0)
+                          : (status.voltage > 0 ? ((status.voltage - 3.20) / (4.20 - 3.20)).clamp(0.0, 1.0) : 0.0),
+                      minHeight: 8,
+                      backgroundColor: isDark ? AppTheme.obsidianSurface : const Color(0xFFF1F5F9),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        battery > 20 ? AppTheme.onlineGreen : AppTheme.warningAmber,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(duration: 200.ms).slideY(begin: 0.05, end: 0),
+
+            const Gap(12),
+
+            // 2. Tarjeta de Señal de Radio LoRa
+            _buildCard(
+              context: context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.sensors_rounded,
+                              color: AppTheme.electricBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const Gap(10),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Señal de Radio LoRa',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark ? Colors.white : AppTheme.textDark,
+                                ),
+                              ),
+                              Text(
+                                '${status.frequencyMhz.toStringAsFixed(0)} MHz (SUBTEL Chile)',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isBleConnected
+                              ? (isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight)
+                              : (isDark ? AppTheme.obsidianSurface : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: isBleConnected ? AppTheme.onlineGreen : AppTheme.textSubtle,
+                                shape: BoxShape.circle,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const Gap(6),
                             Text(
-                              'Inspeccionar paquetes LoRa, telemetría y BLE',
+                              isBleConnected ? 'Enlace Activo' : 'Desconectado',
                               style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                color: Color(0xFFA0AEC0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isBleConnected ? AppTheme.onlineGreen : AppTheme.textSubtle,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white54, size: 16),
                     ],
                   ),
-                ),
+                  const Gap(16),
+                  Row(
+                    children: [
+                      _buildMetricBox(
+                        context: context,
+                        label: 'Señal LoRa',
+                        value: status.signalDbm != 0 ? '${status.signalDbm} dBm' : '--',
+                        icon: Icons.signal_cellular_alt_rounded,
+                      ),
+                      const Gap(8),
+                      _buildMetricBox(
+                        context: context,
+                        label: 'Nodos Malla',
+                        value: '${status.activeNodesCount}',
+                        icon: Icons.people_outline_rounded,
+                      ),
+                      const Gap(8),
+                      _buildMetricBox(
+                        context: context,
+                        label: 'Mensajes',
+                        value: '${status.totalMessagesTransmitted}',
+                        icon: Icons.send_rounded,
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
+            ).animate().fadeIn(delay: 50.ms, duration: 200.ms).slideY(begin: 0.05, end: 0),
 
-          // 4. Botón Rojo Destacado GUÍA DE EMERGENCIA
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              gradient: const LinearGradient(
-                colors: [Color(0xFFE53E3E), Color(0xFFC53030)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFE53E3E).withAlpha(90),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => EmergencyGuideSheet.show(context),
-                borderRadius: BorderRadius.circular(20),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 20),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: const [
-                      Icon(Icons.warning_amber_rounded, color: Colors.white, size: 28),
-                      SizedBox(width: 12),
-                      Text(
-                        'GUÍA DE EMERGENCIA',
+            const Gap(12),
+
+            // 3. Tarjeta de Información del Nodo
+            _buildCard(
+              context: context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Información del Nodo',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                    ),
+                  ),
+                  const Gap(12),
+                  _buildInfoRow(context, 'Modelo Hardware', status.hardwareModel),
+                  _buildInfoRow(context, 'ID del Nodo (Hex)', status.nodeId),
+                  _buildInfoRow(context, 'Número de Nodo', status.myNodeNum != 0 ? '${status.myNodeNum}' : '--'),
+                  _buildInfoRow(context, 'Versión Firmware', status.firmwareVersion.isNotEmpty ? status.firmwareVersion : '--'),
+                  _buildInfoRow(
+                    context,
+                    'Nombre de Usuario',
+                    provider.userName,
+                    onTap: () => _showEditNameDialog(context),
+                    trailing: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'Editar',
                         style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.white,
-                          letterSpacing: 0.8,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppTheme.electricBlue,
+                        ),
+                      ),
+                    ),
+                  ),
+                  _buildInfoRow(
+                    context,
+                    'Dispositivo BLE',
+                    status.connectedDeviceName.isNotEmpty ? status.connectedDeviceName : 'Sin conexión',
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 100.ms, duration: 200.ms).slideY(begin: 0.05, end: 0),
+
+            const Gap(12),
+
+            // 4. Tarjeta de Ubicación GPS y Memoria Flash de la Radio
+            _buildCard(
+              context: context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.location_on_rounded,
+                              color: AppTheme.electricBlue,
+                              size: 20,
+                            ),
+                          ),
+                          const Gap(10),
+                          Text(
+                            'Ubicación GPS & Flash',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark ? Colors.white : AppTheme.textDark,
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (provider.currentGpsPosition != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Text(
+                            'GPS Teléfono',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppTheme.onlineGreen,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const Gap(14),
+                  if (provider.currentGpsPosition != null) ...[
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Latitud',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                  ),
+                                ),
+                                const Gap(2),
+                                Text(
+                                  provider.currentGpsPosition!.latitude.toStringAsFixed(6),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Gap(8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Longitud',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                    color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                  ),
+                                ),
+                                const Gap(2),
+                                Text(
+                                  provider.currentGpsPosition!.longitude.toStringAsFixed(6),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Gap(10),
+                  ],
+                  Text(
+                    'Tu antena WisBlock no tiene chip GPS propio. Al fijar la ubicación, las coordenadas del teléfono se graban en la memoria Flash de la antena para que las siga transmitiendo de forma autónoma al desconectarte.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                      height: 1.35,
+                    ),
+                  ),
+                  const Gap(14),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: (isBleConnected && !provider.isSavingFixedPosition)
+                              ? () async {
+                                  HapticFeedback.lightImpact();
+                                  final ok = await provider.saveCurrentLocationToRadioFlash();
+                                  if (context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(ok
+                                            ? '✅ Ubicación grabada en memoria Flash del WisBlock.'
+                                            : '❌ Error al grabar ubicación en la antena.'),
+                                        backgroundColor: ok ? AppTheme.obsidian : AppTheme.redAlert,
+                                        duration: const Duration(seconds: 3),
+                                      ),
+                                    );
+                                  }
+                                }
+                              : null,
+                          icon: provider.isSavingFixedPosition
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.push_pin_rounded, size: 18),
+                          label: Text(
+                            provider.isSavingFixedPosition ? 'Grabando en Flash...' : 'Fijar Ubicación en Antena',
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.electricBlue,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      if (provider.lastFixedPositionSavedAt != null && isBleConnected) ...[
+                        const Gap(8),
+                        IconButton(
+                          tooltip: 'Borrar posición fija guardada',
+                          onPressed: () async {
+                            HapticFeedback.lightImpact();
+                            final ok = await provider.clearLocationFromRadioFlash();
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(ok
+                                      ? '🧹 Posición fija eliminada de la memoria Flash.'
+                                      : '❌ Error al borrar posición.'),
+                                  backgroundColor: AppTheme.obsidian,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.delete_outline_rounded, size: 20, color: AppTheme.redAlert),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 120.ms, duration: 200.ms).slideY(begin: 0.05, end: 0),
+
+            const Gap(12),
+
+            // 5. Tarjeta de Preferencias y Modo Oscuro
+            _buildCard(
+              context: context,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Apariencia y Tema',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                    ),
+                  ),
+                  const Gap(12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildThemeSegment(
+                          context: context,
+                          label: 'Sistema',
+                          icon: Icons.brightness_auto_rounded,
+                          isSelected: provider.themeMode == ThemeMode.system,
+                          onTap: () => provider.setThemeMode(ThemeMode.system),
+                        ),
+                      ),
+                      const Gap(8),
+                      Expanded(
+                        child: _buildThemeSegment(
+                          context: context,
+                          label: 'Claro',
+                          icon: Icons.light_mode_rounded,
+                          isSelected: provider.themeMode == ThemeMode.light,
+                          onTap: () => provider.setThemeMode(ThemeMode.light),
+                        ),
+                      ),
+                      const Gap(8),
+                      Expanded(
+                        child: _buildThemeSegment(
+                          context: context,
+                          label: 'Oscuro',
+                          icon: Icons.dark_mode_rounded,
+                          isSelected: provider.themeMode == ThemeMode.dark,
+                          onTap: () => provider.setThemeMode(ThemeMode.dark),
                         ),
                       ),
                     ],
                   ),
+                ],
+              ),
+            ).animate().fadeIn(delay: 150.ms, duration: 200.ms).slideY(begin: 0.05, end: 0),
+
+            const Gap(16),
+
+            // Botón Desconectar / Conectar Antena BLE
+            if (isBleConnected)
+              OutlinedButton.icon(
+                onPressed: () => _showDisconnectDialog(context),
+                icon: const Icon(Icons.bluetooth_disabled_rounded, size: 18, color: AppTheme.redAlert),
+                label: const Text(
+                  'Desconectar Antena',
+                  style: TextStyle(color: AppTheme.redAlert, fontWeight: FontWeight.w700),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(
+                    color: isDark ? AppTheme.redAlert.withAlpha(80) : const Color(0xFFFECACA),
+                    width: 1.2,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              )
+            else
+              ElevatedButton.icon(
+                onPressed: () => provider.startPairingScan(),
+                icon: const Icon(Icons.bluetooth_searching_rounded, size: 18),
+                label: const Text('Vincular / Conectar Antena'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? AppTheme.obsidianCard : AppTheme.obsidian,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+              ),
+
+            const Gap(12),
+
+            // Botón Consola de Logs
+            Material(
+              color: isDark ? AppTheme.obsidianCard : Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const LogsScreen()),
+                  );
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.obsidian,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.terminal_rounded,
+                          color: isDark ? AppTheme.electricBlue : Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const Gap(14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Consola de Logs en Vivo',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: isDark ? Colors.white : AppTheme.textDark,
+                              ),
+                            ),
+                            const Gap(2),
+                            Text(
+                              'Inspeccionar paquetes LoRa, telemetría y BLE',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: isDark ? AppTheme.textSubtle : AppTheme.textSubtle, size: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-        ],
+
+            const Gap(12),
+
+            // Botón Guía de Emergencia
+            ElevatedButton(
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                EmergencyGuideSheet.show(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.redAlert,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.warning_amber_rounded, size: 20),
+                  Gap(10),
+                  Text(
+                    'Guía de Emergencia',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            const Gap(24),
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
+
+  Widget _buildCard({required BuildContext context, required Widget child}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.obsidianCard : Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle),
+      ),
+      child: child,
+    );
+  }
+
+  Widget _buildThemeSegment({
+    required BuildContext context,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (isDark ? AppTheme.electricBlue.withAlpha(50) : AppTheme.electricBlueLight)
+              : (isDark ? AppTheme.obsidianSurface : const Color(0xFFF8FAFC)),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.electricBlue
+                : (isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle),
+            width: isSelected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected
+                  ? AppTheme.electricBlue
+                  : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
+            ),
+            const Gap(4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected
+                    ? AppTheme.electricBlue
+                    : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMetricBox({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required IconData icon,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.obsidianSurface : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 16, color: isDark ? AppTheme.textSubtle : AppTheme.textMuted),
+            const Gap(6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: isDark ? Colors.white : AppTheme.textDark,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const Gap(2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(
+    BuildContext context,
+    String key,
+    String value, {
+    bool isLast = false,
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: isLast ? 4 : 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              key,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? Colors.white : AppTheme.textDark,
+                  ),
+                ),
+                if (trailing != null) ...[
+                  const Gap(8),
+                  trailing,
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _showEditNameDialog(BuildContext context) {
     final provider = context.read<MeshProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final textController = TextEditingController(text: provider.userName);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.navy.withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.badge_rounded, color: AppTheme.navy, size: 22),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Nombre del Nodo',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.navy,
-              ),
-            ),
-          ],
+        title: Text(
+          'Nombre del Nodo',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppTheme.textDark,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Este nombre identificará tus mensajes en la malla LoRa:',
               style: TextStyle(
-                fontFamily: 'Roboto',
                 fontSize: 13,
-                color: AppTheme.textMuted,
+                color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
               ),
             ),
-            const SizedBox(height: 14),
+            const Gap(14),
             TextField(
               controller: textController,
               autofocus: true,
               maxLength: 30,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textDark,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? Colors.white : AppTheme.textDark,
               ),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Ej. Juan P. - Central',
                 counterText: '',
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppTheme.navy, width: 2),
-                ),
               ),
             ),
           ],
@@ -667,23 +1046,32 @@ class StatusScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
+            child: Text('Cancelar', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSubtle : AppTheme.textMuted)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = textController.text.trim();
-              if (newName.isNotEmpty) {
-                provider.updateUserName(newName);
-              }
               Navigator.pop(ctx);
+              if (newName.isNotEmpty) {
+                await provider.updateUserName(newName);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Nombre de nodo actualizado a "$newName" en radio y malla'),
+                      backgroundColor: AppTheme.obsidian,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.navy,
+              backgroundColor: AppTheme.electricBlue,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
-            child: const Text('GUARDAR', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -691,38 +1079,25 @@ class StatusScreen extends StatelessWidget {
   }
 
   void _showDisconnectDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.redAlert.withAlpha(25),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.bluetooth_disabled_rounded, color: AppTheme.redAlert, size: 22),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Desconectar Antena',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.navy,
-              ),
-            ),
-          ],
+        title: Text(
+          'Desconectar Antena',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : AppTheme.textDark,
+          ),
         ),
-        content: const Text(
+        content: Text(
           '¿Deseas desconectar el enlace Bluetooth con la antena WisBlock RAK4630?\n\nDejarás de recibir telemetría y mensajes de la malla hasta volver a conectarla.',
           style: TextStyle(
-            fontFamily: 'Roboto',
             fontSize: 14,
-            color: AppTheme.textDark,
+            color: isDark ? AppTheme.textSubtle : AppTheme.textMuted,
             height: 1.4,
           ),
         ),
@@ -730,7 +1105,7 @@ class StatusScreen extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
+            child: Text('Cancelar', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? AppTheme.textSubtle : AppTheme.textMuted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -741,7 +1116,7 @@ class StatusScreen extends StatelessWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Antena WisBlock desconectada.'),
-                    backgroundColor: AppTheme.navy,
+                    backgroundColor: AppTheme.obsidian,
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -751,89 +1126,11 @@ class StatusScreen extends StatelessWidget {
               backgroundColor: AppTheme.redAlert,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
-            child: const Text('DESCONECTAR', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text('Desconectar', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildMetricBox(String label, String value, {bool isOk = true}) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFFEDF2F7)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: isOk ? AppTheme.navy : AppTheme.orange,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String key, String value, {bool isLast = false, Widget? trailing, VoidCallback? onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: EdgeInsets.symmetric(vertical: isLast ? 0 : 6),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              key,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppTheme.textMuted,
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w900,
-                    color: AppTheme.textDark,
-                  ),
-                ),
-                if (trailing != null) ...[
-                  const SizedBox(width: 8),
-                  trailing,
-                ],
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

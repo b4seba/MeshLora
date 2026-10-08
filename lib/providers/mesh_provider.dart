@@ -50,6 +50,7 @@ class MeshProvider with ChangeNotifier {
   StreamSubscription? _inboundMessageSub;
   StreamSubscription? _discoveredDevicesSub;
   Timer? _presenceTickerTimer;
+  bool _isDisposed = false;
 
   AppFlowScreen get currentScreen => _currentScreen;
   int get currentTab => _currentTab;
@@ -66,6 +67,10 @@ class MeshProvider with ChangeNotifier {
   Position? get currentGpsPosition => _currentGpsPosition;
   bool get isGpsActive => _isGpsActive;
   bool get isBroadcastingGps => _isBroadcastingGps;
+  bool _isSavingFixedPosition = false;
+  bool get isSavingFixedPosition => _isSavingFixedPosition;
+  DateTime? _lastFixedPositionSavedAt;
+  DateTime? get lastFixedPositionSavedAt => _lastFixedPositionSavedAt;
   String get gpsStatusMessage => _gpsStatusMessage;
   double? get myLatitude => _currentGpsPosition?.latitude;
   double? get myLongitude => _currentGpsPosition?.longitude;
@@ -78,12 +83,15 @@ class MeshProvider with ChangeNotifier {
     _initBleStreams();
     _startPresenceTicker();
     await _loadStoredPreferences();
+    if (_isDisposed) return;
     startGpsTrackingAndBroadcast();
   }
 
   void _startPresenceTicker() {
+    if (_isDisposed) return;
     _presenceTickerTimer?.cancel();
     _presenceTickerTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (_isDisposed) return;
       final activeCount = _nodesMap.values.where((n) => n.isActive).length;
       if (_deviceStatus.activeNodesCount != activeCount) {
         _deviceStatus = _deviceStatus.copyWith(activeNodesCount: activeCount);
@@ -91,6 +99,9 @@ class MeshProvider with ChangeNotifier {
       notifyListeners();
     });
   }
+
+  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode get themeMode => _themeMode;
 
   Future<void> _loadStoredPreferences() async {
     final savedName = await _storageService.getUserName();
@@ -101,7 +112,32 @@ class MeshProvider with ChangeNotifier {
     if (savedMessages != null && savedMessages.isNotEmpty) {
       _messages.addAll(savedMessages);
     }
+    final savedTheme = await _storageService.getThemeMode();
+    if (savedTheme == 'light') {
+      _themeMode = ThemeMode.light;
+    } else if (savedTheme == 'dark') {
+      _themeMode = ThemeMode.dark;
+    } else {
+      _themeMode = ThemeMode.system;
+    }
     notifyListeners();
+  }
+
+  Future<void> setThemeMode(ThemeMode mode) async {
+    _themeMode = mode;
+    final modeStr = mode == ThemeMode.light
+        ? 'light'
+        : (mode == ThemeMode.dark ? 'dark' : 'system');
+    await _storageService.saveThemeMode(modeStr);
+    notifyListeners();
+  }
+
+  Future<void> toggleThemeMode() async {
+    if (_themeMode == ThemeMode.dark) {
+      await setThemeMode(ThemeMode.light);
+    } else {
+      await setThemeMode(ThemeMode.dark);
+    }
   }
 
   void _initBleStreams() {
@@ -115,7 +151,6 @@ class MeshProvider with ChangeNotifier {
           connectedDeviceName: _bleService.connectedDeviceName,
           connectedDeviceId: _bleService.connectedDeviceId,
         );
-        // Si ya tenemos coordenadas GPS del teléfono, compartirlas con la antena WisBlock por BLE/LoRa
         if (_currentGpsPosition != null) {
           Future.delayed(const Duration(seconds: 2), () => broadcastMyLocation());
         }
@@ -130,24 +165,42 @@ class MeshProvider with ChangeNotifier {
 
     // 2. Info de la placa local (MyNodeInfo de Meshtastic)
     _myNodeInfoSub = _bleService.myNodeInfoStream.listen((myInfo) {
+      final hasFw = myInfo.firmwareVersion.isNotEmpty;
+      final volt = myInfo.voltage > 0 ? myInfo.voltage : _deviceStatus.voltage;
+      int effBattery = 0;
+      if (volt > 0) {
+        if (volt >= 4.20) {
+          effBattery = 100;
+        } else if (volt <= 3.20) {
+          effBattery = 0;
+        } else {
+          effBattery = ((volt - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+        }
+      } else if (myInfo.batteryLevel > 0 && myInfo.batteryLevel < 100) {
+        effBattery = myInfo.batteryLevel;
+      }
+
       _deviceStatus = _deviceStatus.copyWith(
         myNodeNum: myInfo.myNodeNum,
         nodeId: myInfo.nodeHex,
-        firmwareVersion: myInfo.firmwareVersion.isNotEmpty ? myInfo.firmwareVersion : _deviceStatus.firmwareVersion,
+        firmwareVersion: hasFw ? myInfo.firmwareVersion : _deviceStatus.firmwareVersion,
         channelUtilization: myInfo.channelUtilization > 0 ? myInfo.channelUtilization : _deviceStatus.channelUtilization,
         airUtilTx: myInfo.airUtilTx > 0 ? myInfo.airUtilTx : _deviceStatus.airUtilTx,
-        batteryPercent: myInfo.batteryLevel,
-        voltage: myInfo.voltage,
+        batteryPercent: effBattery,
+        voltage: volt > 0 ? volt : _deviceStatus.voltage,
         isLoRaActive: true,
       );
       notifyListeners();
     });
 
-    // 3. Metadata del dispositivo (Firmware, modelo)
+    // 3. Metadata del dispositivo (Firmware, modelo de hardware)
     _metadataSub = _bleService.metadataStream.listen((meta) {
-      if (meta.firmwareVersion.isNotEmpty) {
+      final hasFw = meta.firmwareVersion.isNotEmpty;
+      final hasHw = meta.hwModelName.isNotEmpty;
+      if (hasFw || hasHw) {
         _deviceStatus = _deviceStatus.copyWith(
-          firmwareVersion: meta.firmwareVersion,
+          firmwareVersion: hasFw ? meta.firmwareVersion : _deviceStatus.firmwareVersion,
+          hardwareModel: hasHw ? meta.hwModelName : _deviceStatus.hardwareModel,
         );
         notifyListeners();
       }
@@ -158,9 +211,26 @@ class MeshProvider with ChangeNotifier {
       final isLocal = telemetry.nodeNum == _bleService.myNodeNum || _bleService.myNodeNum == 0;
 
       if (isLocal) {
+        final volt = telemetry.voltage ?? _deviceStatus.voltage;
+        int effectiveBattery = 0;
+
+        // Calcular porcentaje real en base al voltaje (3.20V a 4.20V LiPo)
+        // Solo 100% si el voltaje alcanza o supera 4.20V
+        if (volt > 0) {
+          if (volt >= 4.20) {
+            effectiveBattery = 100;
+          } else if (volt <= 3.20) {
+            effectiveBattery = 0;
+          } else {
+            effectiveBattery = ((volt - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+          }
+        } else if (telemetry.batteryLevel > 0 && telemetry.batteryLevel < 100) {
+          effectiveBattery = telemetry.batteryLevel;
+        }
+
         _deviceStatus = _deviceStatus.copyWith(
-          batteryPercent: telemetry.batteryLevel,
-          voltage: telemetry.voltage ?? _deviceStatus.voltage,
+          batteryPercent: effectiveBattery,
+          voltage: volt > 0 ? volt : _deviceStatus.voltage,
           channelUtilization: telemetry.channelUtilization ?? _deviceStatus.channelUtilization,
           airUtilTx: telemetry.airUtilTx ?? _deviceStatus.airUtilTx,
         );
@@ -212,9 +282,23 @@ class MeshProvider with ChangeNotifier {
 
       // Si es mi propio nodo y reporta métricas, actualizar DeviceStatus
       if (isMe) {
+        final volt = node.voltage ?? _deviceStatus.voltage;
+        int effBattery = 0;
+        if (volt > 0) {
+          if (volt >= 4.20) {
+            effBattery = 100;
+          } else if (volt <= 3.20) {
+            effBattery = 0;
+          } else {
+            effBattery = ((volt - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+          }
+        } else if (node.batteryLevel > 0 && node.batteryLevel < 100) {
+          effBattery = node.batteryLevel;
+        }
+
         _deviceStatus = _deviceStatus.copyWith(
-          batteryPercent: node.batteryLevel,
-          voltage: node.voltage ?? _deviceStatus.voltage,
+          batteryPercent: effBattery,
+          voltage: volt > 0 ? volt : _deviceStatus.voltage,
           nodeId: node.id,
         );
       }
@@ -458,14 +542,24 @@ class MeshProvider with ChangeNotifier {
       notifyListeners();
 
       await Future.delayed(const Duration(milliseconds: 1400));
-      _currentScreen = AppFlowScreen.mainNav;
-      notifyListeners();
+      if (_currentScreen == AppFlowScreen.pairedSuccess) {
+        _currentScreen = AppFlowScreen.mainNav;
+        notifyListeners();
+      }
     }
+  }
+
+  void completePairing() {
+    _currentScreen = AppFlowScreen.mainNav;
+    notifyListeners();
   }
 
   Future<void> saveUserNameAndContinue(String name) async {
     _userName = name.trim().isEmpty ? 'Usuario LoRa' : name.trim();
     await _storageService.saveUserName(_userName);
+    if (_bleService.isConnected) {
+      await _bleService.setNodeOwner(longName: _userName);
+    }
     _currentScreen = AppFlowScreen.mainNav;
     notifyListeners();
   }
@@ -475,6 +569,12 @@ class MeshProvider with ChangeNotifier {
     if (clean.isEmpty) return;
     _userName = clean;
     await _storageService.saveUserName(_userName);
+
+    // Si la radio está conectada por Bluetooth, actualizamos la memoria flash de la radio
+    // y difundimos el nuevo nombre por la malla LoRa
+    if (_bleService.isConnected) {
+      await _bleService.setNodeOwner(longName: _userName);
+    }
     notifyListeners();
   }
 
@@ -538,16 +638,17 @@ class MeshProvider with ChangeNotifier {
 
   /// Inicia la lectura del GPS del teléfono y programa la difusión periódica por LoRa
   Future<bool> startGpsTrackingAndBroadcast() async {
+    if (_isDisposed) return false;
     try {
       final hasPermission = await _checkAndRequestGpsPermissions();
-      if (!hasPermission) {
+      if (!hasPermission || _isDisposed) {
         _gpsStatusMessage = 'Permiso GPS denegado';
         notifyListeners();
         return false;
       }
 
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
+      if (!serviceEnabled || _isDisposed) {
         _gpsStatusMessage = 'Ubicación desactivada';
         notifyListeners();
         return false;
@@ -570,12 +671,16 @@ class MeshProvider with ChangeNotifier {
         pos = null;
       }
 
+      if (_isDisposed) return false;
+
       if (pos != null) {
         _updateMyGpsPosition(pos);
         if (_isPaired) {
           await broadcastMyLocation();
         }
       }
+
+      if (_isDisposed) return false;
 
       // 2. Suscribirse a actualizaciones de movimiento del teléfono
       _gpsStreamSub?.cancel();
@@ -585,21 +690,25 @@ class MeshProvider with ChangeNotifier {
           distanceFilter: 10, // cada 10 metros
         ),
       ).listen((newPos) {
-        _updateMyGpsPosition(newPos);
+        if (!_isDisposed) {
+          _updateMyGpsPosition(newPos);
+        }
       });
 
       // 3. Temporizador de re-emisión periódica (cada 60 segundos por LoRa a la malla)
       _gpsPeriodicBroadcastTimer?.cancel();
       _gpsPeriodicBroadcastTimer = Timer.periodic(const Duration(seconds: 60), (_) {
-        if (_isGpsActive && _currentGpsPosition != null && _isPaired) {
+        if (!_isDisposed && _isGpsActive && _currentGpsPosition != null && _isPaired) {
           broadcastMyLocation();
         }
       });
 
       return true;
     } catch (e) {
-      _gpsStatusMessage = 'Error GPS: $e';
-      notifyListeners();
+      if (!_isDisposed) {
+        _gpsStatusMessage = 'Error GPS: $e';
+        notifyListeners();
+      }
       return false;
     }
   }
@@ -732,8 +841,88 @@ class MeshProvider with ChangeNotifier {
     }
   }
 
+  /// Graba la ubicación actual del celular en la memoria Flash permanente de la antena WisBlock.
+  /// De esta manera, si el celular se desconecta, la antena seguirá transmitiendo por LoRa
+  /// las coordenadas reales sin recurrir a posiciones antiguas o erróneas.
+  Future<bool> saveCurrentLocationToRadioFlash() async {
+    if (_isSavingFixedPosition) return false;
+    _isSavingFixedPosition = true;
+    notifyListeners();
+
+    try {
+      if (_currentGpsPosition == null) {
+        try {
+          _currentGpsPosition = await Geolocator.getCurrentPosition(
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 4),
+            ),
+          );
+        } catch (_) {
+          _currentGpsPosition = null;
+        }
+      }
+
+      if (_currentGpsPosition == null) {
+        RadioLogger().warn('POSICIÓN FIJA', 'No se pudo obtener la posición GPS del celular para fijar.');
+        return false;
+      }
+
+      final lat = _currentGpsPosition!.latitude;
+      final lon = _currentGpsPosition!.longitude;
+      final alt = _currentGpsPosition!.altitude.toInt();
+
+      // 1. Grabar en Flash/NVRAM del nodo WisBlock
+      final ok = await _bleService.setFixedPosition(
+        latitude: lat,
+        longitude: lon,
+        altitude: alt,
+      );
+
+      if (ok) {
+        _lastFixedPositionSavedAt = DateTime.now();
+        // 2. Emitir también inmediatamente a la malla LoRa
+        await _bleService.sendPosition(
+          latitude: lat,
+          longitude: lon,
+          altitude: alt,
+        );
+      }
+
+      return ok;
+    } catch (e) {
+      RadioLogger().error('POSICIÓN FIJA', 'Error guardando posición fija: $e');
+      return false;
+    } finally {
+      _isSavingFixedPosition = false;
+      notifyListeners();
+    }
+  }
+
+  /// Borra la posición fija guardada en la memoria Flash de la antena WisBlock.
+  Future<bool> clearLocationFromRadioFlash() async {
+    try {
+      final ok = await _bleService.removeFixedPosition();
+      if (ok) {
+        _lastFixedPositionSavedAt = null;
+        notifyListeners();
+      }
+      return ok;
+    } catch (e) {
+      RadioLogger().error('POSICIÓN FIJA', 'Error borrando posición fija: $e');
+      return false;
+    }
+  }
+
+  @override
+  void notifyListeners() {
+    if (_isDisposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
+    _isDisposed = true;
     _gpsStreamSub?.cancel();
     _gpsPeriodicBroadcastTimer?.cancel();
     _presenceTickerTimer?.cancel();

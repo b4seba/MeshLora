@@ -45,8 +45,8 @@ class MeshtasticMyNodeInfo {
     this.rebootCount = 0,
     this.channelUtilization = 0.0,
     this.airUtilTx = 0.0,
-    this.batteryLevel = 100,
-    this.voltage = 4.2,
+    this.batteryLevel = 0,
+    this.voltage = 0.0,
   });
 
   String get nodeHex => '!${myNodeNum.toRadixString(16).padLeft(8, '0')}';
@@ -62,6 +62,34 @@ class MeshtasticDeviceMetadata {
     this.hwModel = 0,
     this.role = 0,
   });
+
+  String get hwModelName {
+    switch (hwModel) {
+      case 9:
+      case 25:
+        return 'WisBlock RAK4631';
+      case 1:
+        return 'TLora V2';
+      case 2:
+        return 'TLora V1';
+      case 3:
+        return 'TLora V2.1_1.6';
+      case 4:
+        return 'TBeam';
+      case 5:
+        return 'Heltec V2';
+      case 6:
+        return 'TBeam V0.7';
+      case 7:
+        return 'T-Echo';
+      case 8:
+        return 'T-Watch';
+      case 43:
+        return 'Heltec V3';
+      default:
+        return hwModel > 0 ? 'Dispositivo LoRa ($hwModel)' : 'WisBlock RAK4630';
+    }
+  }
 }
 
 class MeshtasticTelemetry {
@@ -167,36 +195,33 @@ class MeshtasticProtocol {
       final fieldNum = tag.fieldNumber;
       final wireType = tag.wireType;
 
-      // Tag 2: MeshPacket (paquete recibido por LoRa o local)
-      if (fieldNum == 2 && wireType == _WireType.lengthDelimited) {
+      // Tag 1 o 2: MeshPacket (paquete recibido por LoRa o local)
+      if ((fieldNum == 1 || fieldNum == 2) && wireType == _WireType.lengthDelimited) {
         final packetBytes = reader.readBytes();
-        return _decodeMeshPacket(packetBytes);
+        final meshRes = _decodeMeshPacket(packetBytes);
+        if (meshRes != null) return meshRes;
+        final myInfoRes = _decodeMyNodeInfo(packetBytes);
+        if (myInfoRes.myNodeNum > 0) return myInfoRes;
       }
-      // Tag 3: MyNodeInfo (info de nuestra placa local conectada por BLE)
-      else if (fieldNum == 3 && wireType == _WireType.lengthDelimited) {
+      // Tag 2 o 3: MyNodeInfo (info de nuestra placa local conectada por BLE)
+      else if ((fieldNum == 2 || fieldNum == 3) && wireType == _WireType.lengthDelimited) {
         final myInfoBytes = reader.readBytes();
         return _decodeMyNodeInfo(myInfoBytes);
       }
-      // Tag 4: NodeInfo (info de un nodo de la malla almacenado en la DB del WisBlock)
-      else if (fieldNum == 4 && wireType == _WireType.lengthDelimited) {
+      // Tag 3 o 4: NodeInfo (info de un nodo de la malla almacenado en la DB del WisBlock)
+      else if ((fieldNum == 3 || fieldNum == 4) && wireType == _WireType.lengthDelimited) {
         final nodeInfoBytes = reader.readBytes();
         return _decodeNodeInfo(nodeInfoBytes);
       }
-      // Tag 5, 13, 17: DeviceMetadata / Config
-      else if ((fieldNum == 5 || fieldNum == 13 || fieldNum == 17) && wireType == _WireType.lengthDelimited) {
+      // Tag 12 o 16: DeviceMetadata
+      else if ((fieldNum == 12 || fieldNum == 16) && wireType == _WireType.lengthDelimited) {
         final metaBytes = reader.readBytes();
         return _decodeDeviceMetadata(metaBytes);
       }
-      // Tag 7: config_complete_id
-      else if (fieldNum == 7) {
+      // Tag 6 o 7: config_complete_id
+      else if (fieldNum == 6 || fieldNum == 7) {
         final configId = reader.readVarint();
         return {'type': 'config_complete', 'config_id': configId};
-      }
-      // Fallback para variantes antiguas
-      else if (fieldNum == 1 && wireType == _WireType.lengthDelimited) {
-        final subBytes = reader.readBytes();
-        final res = _decodeMeshPacket(subBytes) ?? _decodeMyNodeInfo(subBytes);
-        if (res != null) return res;
       } else {
         reader.skipField(wireType);
       }
@@ -530,7 +555,7 @@ class MeshtasticProtocol {
 
   static MeshtasticTelemetry _decodeTelemetryPayload(int fromNodeNum, Uint8List payloadBytes, DateTime timestamp) {
     final reader = _ProtobufReader(payloadBytes);
-    int battery = 100;
+    int rawBattery = 0;
     double? voltage;
     double? chUtil;
     double? airUtil;
@@ -546,7 +571,7 @@ class MeshtasticProtocol {
           final dTag = dmReader.readTag();
           switch (dTag.fieldNumber) {
             case 1:
-              battery = dmReader.readVarint();
+              rawBattery = dmReader.readVarint();
               break;
             case 2:
               voltage = dmReader.readFloat();
@@ -581,9 +606,22 @@ class MeshtasticProtocol {
       }
     }
 
+    int effectiveBattery = 0;
+    if (voltage != null && voltage > 0) {
+      if (voltage >= 4.20) {
+        effectiveBattery = 100;
+      } else if (voltage <= 3.20) {
+        effectiveBattery = 0;
+      } else {
+        effectiveBattery = ((voltage - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+      }
+    } else if (rawBattery > 0 && rawBattery < 100) {
+      effectiveBattery = rawBattery;
+    }
+
     return MeshtasticTelemetry(
       nodeNum: fromNodeNum,
-      batteryLevel: battery,
+      batteryLevel: effectiveBattery,
       voltage: voltage,
       channelUtilization: chUtil,
       airUtilTx: airUtil,
@@ -819,6 +857,199 @@ class MeshtasticProtocol {
 
     return toRadioWriter.toBytes();
   }
+
+  /// Construye un paquete `ToRadio` con un comando de administración `AdminMessage.set_owner`
+  /// para configurar el nombre largo y corto del nodo en la memoria flash/NVS de la radio WisBlock.
+  static Uint8List buildSetOwnerPacket({
+    required String longName,
+    required String shortName,
+    required int myNodeNum,
+  }) {
+    final rand = Random();
+    final packetId = rand.nextInt(0x7FFFFFFF);
+    final nodeHex = '!${myNodeNum.toRadixString(16).padLeft(8, '0')}';
+
+    // 1. User submessage
+    final userWriter = _ProtobufWriter();
+    userWriter.writeStringField(1, nodeHex);    // id
+    userWriter.writeStringField(2, longName);   // long_name
+    userWriter.writeStringField(3, shortName);  // short_name
+    final userBytes = userWriter.toBytes();
+
+    // 2. AdminMessage submessage (field 32: set_owner en AdminMessage protobuf)
+    final adminWriter = _ProtobufWriter();
+    adminWriter.writeBytesField(32, userBytes);
+    final adminBytes = adminWriter.toBytes();
+
+    // 3. Data submessage (ADMIN_APP = 6)
+    final dataWriter = _ProtobufWriter();
+    dataWriter.writeVarintField(1, kPortNumAdmin); // portnum = ADMIN_APP
+    dataWriter.writeBytesField(2, adminBytes);     // payload
+    dataWriter.writeVarintField(3, 1);              // want_response = true
+    final dataBytes = dataWriter.toBytes();
+
+    // 4. MeshPacket submessage (destinado al nodo local / radio conectada)
+    final packetWriter = _ProtobufWriter();
+    if (myNodeNum > 0) {
+      packetWriter.writeFixed32Field(1, myNodeNum); // from
+    }
+    packetWriter.writeFixed32Field(2, myNodeNum > 0 ? myNodeNum : kBroadcastNodeNum); // to
+    packetWriter.writeVarintField(3, 0);            // channel = 0
+    packetWriter.writeBytesField(4, dataBytes);      // decoded (Data)
+    packetWriter.writeFixed32Field(6, packetId);     // id
+    packetWriter.writeVarintField(9, 0);            // hop_limit = 0 (directo al radio)
+    packetWriter.writeVarintField(10, 0);           // want_ack = false
+    final meshPacketBytes = packetWriter.toBytes();
+
+    // 5. ToRadio message (field 1: packet)
+    final toRadioWriter = _ProtobufWriter();
+    toRadioWriter.writeBytesField(1, meshPacketBytes);
+
+    return toRadioWriter.toBytes();
+  }
+
+  /// Construye un paquete `ToRadio` con un `MeshPacket` de tipo `NODEINFO_APP` (4)
+  /// para anunciar el nuevo nombre del nodo por difusión (broadcast) a toda la malla LoRa.
+  static Uint8List buildNodeInfoPacket({
+    required String longName,
+    required String shortName,
+    required int myNodeNum,
+    int channel = 0,
+    int hopLimit = 3,
+  }) {
+    final rand = Random();
+    final packetId = rand.nextInt(0x7FFFFFFF);
+    final nodeHex = '!${myNodeNum.toRadixString(16).padLeft(8, '0')}';
+
+    // 1. User submessage
+    final userWriter = _ProtobufWriter();
+    userWriter.writeStringField(1, nodeHex);    // id
+    userWriter.writeStringField(2, longName);   // long_name
+    userWriter.writeStringField(3, shortName);  // short_name
+    final userBytes = userWriter.toBytes();
+
+    // 2. Data submessage (NODEINFO_APP = 4)
+    final dataWriter = _ProtobufWriter();
+    dataWriter.writeVarintField(1, kPortNumNodeInfo); // portnum = NODEINFO_APP
+    dataWriter.writeBytesField(2, userBytes);          // payload = User
+    dataWriter.writeVarintField(3, 0);                 // want_response = false
+    final dataBytes = dataWriter.toBytes();
+
+    // 3. MeshPacket submessage (broadcast a toda la malla)
+    final packetWriter = _ProtobufWriter();
+    if (myNodeNum > 0) {
+      packetWriter.writeFixed32Field(1, myNodeNum);    // from
+    }
+    packetWriter.writeFixed32Field(2, kBroadcastNodeNum); // to (broadcast)
+    packetWriter.writeVarintField(3, channel);         // channel
+    packetWriter.writeBytesField(4, dataBytes);         // decoded (Data)
+    packetWriter.writeFixed32Field(6, packetId);        // id
+    packetWriter.writeVarintField(9, hopLimit);         // hop_limit
+    packetWriter.writeVarintField(10, 0);                // want_ack = false
+    final meshPacketBytes = packetWriter.toBytes();
+
+    // 4. ToRadio message (field 1: packet)
+    final toRadioWriter = _ProtobufWriter();
+    toRadioWriter.writeBytesField(1, meshPacketBytes);
+
+    return toRadioWriter.toBytes();
+  }
+
+  /// Construye un paquete `ToRadio` con un comando de administración `AdminMessage.set_fixed_position`
+  /// para programar las coordenadas en la memoria Flash/NVS de la radio WisBlock RAK4630.
+  /// Esto permite que el nodo transmita de forma autónoma la posición real incluso cuando el teléfono se desconecte.
+  static Uint8List buildSetFixedPositionPacket({
+    required double latitude,
+    required double longitude,
+    int? altitude,
+    required int myNodeNum,
+  }) {
+    final rand = Random();
+    final packetId = rand.nextInt(0x7FFFFFFF);
+
+    // 1. Position submessage
+    final posWriter = _ProtobufWriter();
+    posWriter.writeSFixed32Field(1, (latitude * 10000000.0).round());
+    posWriter.writeSFixed32Field(2, (longitude * 10000000.0).round());
+    if (altitude != null) {
+      posWriter.writeVarintField(3, altitude);
+    }
+    posWriter.writeFixed32Field(4, DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    posWriter.writeVarintField(5, 3); // LOC_MANUAL / LOC_EXTERNAL
+    posWriter.writeVarintField(23, 32); // 32 bits precisión exacta
+    final posBytes = posWriter.toBytes();
+
+    // 2. AdminMessage submessage (field 40: set_fixed_position)
+    final adminWriter = _ProtobufWriter();
+    adminWriter.writeBytesField(40, posBytes);
+    final adminBytes = adminWriter.toBytes();
+
+    // 3. Data submessage (ADMIN_APP = 6)
+    final dataWriter = _ProtobufWriter();
+    dataWriter.writeVarintField(1, kPortNumAdmin);
+    dataWriter.writeBytesField(2, adminBytes);
+    dataWriter.writeVarintField(3, 1); // want_response = true
+    final dataBytes = dataWriter.toBytes();
+
+    // 4. MeshPacket submessage (directo al radio conectado)
+    final packetWriter = _ProtobufWriter();
+    if (myNodeNum > 0) {
+      packetWriter.writeFixed32Field(1, myNodeNum);
+    }
+    packetWriter.writeFixed32Field(2, myNodeNum > 0 ? myNodeNum : kBroadcastNodeNum);
+    packetWriter.writeVarintField(3, 0);
+    packetWriter.writeBytesField(4, dataBytes);
+    packetWriter.writeFixed32Field(6, packetId);
+    packetWriter.writeVarintField(9, 0); // hop_limit = 0
+    packetWriter.writeVarintField(10, 0);
+    final meshPacketBytes = packetWriter.toBytes();
+
+    // 5. ToRadio message
+    final toRadioWriter = _ProtobufWriter();
+    toRadioWriter.writeBytesField(1, meshPacketBytes);
+
+    return toRadioWriter.toBytes();
+  }
+
+  /// Construye un paquete `ToRadio` con un comando de administración `AdminMessage.remove_fixed_position`
+  /// para borrar la posición fija grabada en la memoria Flash/NVS de la radio WisBlock.
+  static Uint8List buildRemoveFixedPositionPacket({
+    required int myNodeNum,
+  }) {
+    final rand = Random();
+    final packetId = rand.nextInt(0x7FFFFFFF);
+
+    // 1. AdminMessage submessage (field 41: remove_fixed_position = true)
+    final adminWriter = _ProtobufWriter();
+    adminWriter.writeVarintField(41, 1);
+    final adminBytes = adminWriter.toBytes();
+
+    // 2. Data submessage (ADMIN_APP = 6)
+    final dataWriter = _ProtobufWriter();
+    dataWriter.writeVarintField(1, kPortNumAdmin);
+    dataWriter.writeBytesField(2, adminBytes);
+    dataWriter.writeVarintField(3, 1);
+    final dataBytes = dataWriter.toBytes();
+
+    // 3. MeshPacket submessage (directo al radio conectado)
+    final packetWriter = _ProtobufWriter();
+    if (myNodeNum > 0) {
+      packetWriter.writeFixed32Field(1, myNodeNum);
+    }
+    packetWriter.writeFixed32Field(2, myNodeNum > 0 ? myNodeNum : kBroadcastNodeNum);
+    packetWriter.writeVarintField(3, 0);
+    packetWriter.writeBytesField(4, dataBytes);
+    packetWriter.writeFixed32Field(6, packetId);
+    packetWriter.writeVarintField(9, 0);
+    packetWriter.writeVarintField(10, 0);
+    final meshPacketBytes = packetWriter.toBytes();
+
+    // 4. ToRadio message
+    final toRadioWriter = _ProtobufWriter();
+    toRadioWriter.writeBytesField(1, meshPacketBytes);
+
+    return toRadioWriter.toBytes();
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -988,5 +1219,9 @@ class _ProtobufWriter {
     writeTag(fieldNumber, _WireType.lengthDelimited);
     writeVarint(bytes.length);
     _bytes.addAll(bytes);
+  }
+
+  void writeStringField(int fieldNumber, String value) {
+    writeBytesField(fieldNumber, utf8.encode(value));
   }
 }

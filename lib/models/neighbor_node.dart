@@ -14,7 +14,7 @@ class NeighborNode {
   final double yPercent; // 0..100 para renderizado en mapa
   final bool isUrgent;
   final bool isMe;
-  final int batteryPercent;
+  final int _rawBatteryPercent;
   final double? voltage;
   final double? snr;
   final DateTime lastSeen;
@@ -35,14 +35,24 @@ class NeighborNode {
     required this.yPercent,
     this.isUrgent = false,
     this.isMe = false,
-    this.batteryPercent = 100,
+    int batteryPercent = 0,
     this.voltage,
     this.snr,
     required this.lastSeen,
     this.hopsAway = 0,
     this.isHighPrecision = false,
     this.precisionBits = 32,
-  });
+  }) : _rawBatteryPercent = batteryPercent;
+
+  /// Porcentaje real de batería LiPo calculado a partir del voltaje
+  int get batteryPercent {
+    if (voltage != null && voltage! > 0) {
+      if (voltage! >= 4.20) return 100;
+      if (voltage! <= 3.20) return 0;
+      return ((voltage! - 3.20) / (4.20 - 3.20) * 100).clamp(0, 100).round();
+    }
+    return (_rawBatteryPercent > 0 && _rawBatteryPercent < 100) ? _rawBatteryPercent : 0;
+  }
 
   /// Un nodo está ACTIVO si es mi radio local o si se ha escuchado algún paquete de él en los últimos 15 minutos
   bool get isActive {

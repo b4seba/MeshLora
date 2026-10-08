@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'providers/mesh_provider.dart';
 import 'screens/main_navigation_screen.dart';
+import 'screens/name_input_screen.dart';
 import 'screens/pairing_screen.dart';
 import 'screens/splash_screen.dart';
 import 'theme/app_theme.dart';
@@ -35,9 +36,11 @@ class RadioMeshApp extends StatelessWidget {
       child: Consumer<MeshProvider>(
         builder: (context, provider, child) {
           return MaterialApp(
-            title: 'Radio-Mesh Maule',
+            title: 'Alerta Mesh Maule',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.theme,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: provider.themeMode,
             home: _buildCurrentScreen(provider.currentScreen),
           );
         },
@@ -53,6 +56,7 @@ class RadioMeshApp extends StatelessWidget {
       case AppFlowScreen.pairedSuccess:
         return const PairingScreen();
       case AppFlowScreen.nameInput:
+        return const NameInputScreen();
       case AppFlowScreen.mainNav:
         return const MainNavigationScreen();
     }

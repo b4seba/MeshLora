@@ -1,0 +1,36 @@
+# Alerta Mesh — Elite Mobile UI/UX & Flutter Clean Design Rules
+# Based on PatrickJS/awesome-cursorrules, Apple HIG & Uber Base Design System
+
+## 1. Core Visual Philosophy (Anti-"AI Vibe")
+- **Monochromatic Canvas + Calculated Accents**:
+  - Light Background: #FFFFFF / #F8FAFC
+  - Dark Surface / Brand Dark: #0B132B (Obsidian Midnight from Logo)
+  - Brand Primary: #2B70C9 / #2563EB (Electric Mesh Blue)
+  - Semantic SOS / Emergency: #EF4444
+  - Active Signal / Online: #10B981
+  - Neutral Borders: 1px subtle borders (#E2E8F0 in light mode, rgba(255,255,255,0.08) in dark mode).
+- **Zero Heavy Shadows**: Replace bloated drop shadows with sleek 1px borders and subtle 2% opacity surface tints.
+- **Never use full saturated color blocks** for entire AppBars or backgrounds unless it's a critical emergency modal.
+
+## 2. Typography Hierarchy (Modern Neo-Grotesk)
+- Primary Font Family: `GoogleFonts.plusJakartaSans()` or `GoogleFonts.inter()`.
+- Title Case only (Avoid aggressive ALL CAPS in general headings).
+- Tight tracking on headers: `letterSpacing: -0.4` to `-0.8`.
+- Clear contrast: Titles in #0B132B / #0F172A, subtitles in #64748B (Slate grey).
+
+## 3. Layout, Spacing & Micro-Interactions
+- **8pt Grid System**: All margins, paddings, and gaps must follow multiples of 4/8 (8, 12, 16, 20, 24, 32).
+- **Haptic Feedback**: Always trigger `HapticFeedback.lightImpact()` on tap for primary actions, bottom navigation changes, and toggles.
+- **Micro-animations**: Use `flutter_animate` for subtle 150-250ms fade & slide entries. Avoid long flashy animations.
+- **Iconography**: Use consistent, thin-line modern icons (`lucide_icons` or `CupertinoIcons`).
+
+## 4. Component Standards
+- **Buttons**:
+  - Primary: High contrast pill or rounded rectangular (radius 12-14px) with Electric Blue or Obsidian background, crisp white text.
+  - Secondary/Tertiary: Neutral light background (#F1F5F9) with dark text and no elevation.
+- **Cards & Lists**:
+  - Border radius: 16px.
+  - Padding: 16px.
+  - Background: White with 1px border (#E2E8F0).
+- **Bottom Navigation**:
+  - Sleek, low-profile navigation bar with subtle active indicators and smooth transitions.

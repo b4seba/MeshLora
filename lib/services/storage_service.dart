@@ -56,6 +56,18 @@ class StorageService {
     }
   }
 
+  static const String _kThemeMode = 'radio_mesh_theme_mode';
+
+  Future<void> saveThemeMode(String mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kThemeMode, mode);
+  }
+
+  Future<String?> getThemeMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kThemeMode);
+  }
+
   Future<void> clearAll() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();

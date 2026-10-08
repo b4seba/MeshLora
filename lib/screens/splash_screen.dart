@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
@@ -9,11 +12,13 @@ class SplashScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppTheme.navy,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
           child: Column(
             children: [
               const Spacer(),
@@ -21,73 +26,69 @@ class SplashScreen extends StatelessWidget {
               const Hero(
                 tag: 'mesh_logo_hero',
                 child: MeshLogo(
-                  size: 130,
-                  nodeColor: AppTheme.lime,
-                  accentColor: AppTheme.orange,
+                  width: 160,
+                  height: 110,
+                  borderRadius: 20,
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  showBorder: true,
                 ),
-              ),
-              const SizedBox(height: 32),
+              )
+                  .animate()
+                  .fadeIn(duration: 400.ms)
+                  .scale(begin: const Offset(0.9, 0.9), end: const Offset(1, 1), curve: Curves.easeOutBack),
 
-              // Título y Subtítulo
-              const Text(
-                'Radio-Mesh',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 34,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 8),
+              const Gap(28),
 
-              // Barra de acento Lima
-              Container(
-                width: 64,
-                height: 3,
-                decoration: BoxDecoration(
-                  color: AppTheme.lime,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
+              // Título Principal
+              Text(
+                'Alerta Mesh',
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                      color: isDark ? Colors.white : AppTheme.textDark,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.6,
+                    ),
+              ).animate().fadeIn(delay: 150.ms, duration: 350.ms).slideY(begin: 0.1, end: 0),
 
-              const Text(
-                'Comunicación de\nEmergencia',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 12),
+              const Gap(10),
 
               Text(
-                'Sin Internet ni Red Celular',
+                'Comunicación de Emergencia Descentralizada',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withAlpha(180),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white.withAlpha(220) : AppTheme.textDark,
+                  letterSpacing: -0.2,
                 ),
-              ),
-              const SizedBox(height: 28),
+              ).animate().fadeIn(delay: 250.ms, duration: 350.ms).slideY(begin: 0.1, end: 0),
 
-              // Tags Maule · Chile
+              const Gap(6),
+
+              Text(
+                'Sin internet · Sin antenas celulares · 100% Offline',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w400,
+                  color: isDark ? AppTheme.textSubtleDark : AppTheme.textMuted,
+                ),
+              ).animate().fadeIn(delay: 350.ms, duration: 350.ms),
+
+              const Gap(28),
+
+              // Badges Minimalistas
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  _buildPillTag('Maule'),
-                  const SizedBox(width: 8),
-                  _buildPillTag('LoRa 915 MHz'),
-                  const SizedBox(width: 8),
-                  _buildPillTag('Chile'),
+                  _buildPillTag(isDark: isDark, icon: Icons.sensors_rounded, text: 'LoRa 915 MHz'),
+                  const Gap(8),
+                  _buildPillTag(isDark: isDark, icon: Icons.location_on_outlined, text: 'Chile'),
+                  const Gap(8),
+                  _buildPillTag(isDark: isDark, icon: Icons.shield_outlined, text: 'Red Malla'),
                 ],
-              ),
+              ).animate().fadeIn(delay: 450.ms, duration: 350.ms),
+
               const Spacer(),
 
               // Botón Comenzar
@@ -95,42 +96,48 @@ class SplashScreen extends StatelessWidget {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () {
+                    HapticFeedback.lightImpact();
                     final provider = context.read<MeshProvider>();
                     provider.startPairingScan();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.orange,
+                    backgroundColor: AppTheme.electricBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 8,
-                    shadowColor: AppTheme.orange.withAlpha(140),
+                    elevation: 0,
                   ),
-                  child: const Text(
-                    'COMENZAR',
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 20,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 1.2,
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      Text(
+                        'Comenzar',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Gap(8),
+                      Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(height: 16),
+              ).animate().fadeIn(delay: 550.ms, duration: 350.ms).slideY(begin: 0.1, end: 0),
+
+              const Gap(16),
 
               Text(
-                'Versión 1.0 · Proyecto Meshemergencia Maule',
+                'Proyecto Radio-Mesh Maule · v1.0',
                 style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withAlpha(120),
+                  color: isDark ? Colors.white.withAlpha(100) : AppTheme.textSubtle,
                 ),
               ),
-              const SizedBox(height: 8),
+              const Gap(8),
             ],
           ),
         ),
@@ -138,22 +145,34 @@ class SplashScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPillTag(String text) {
+  Widget _buildPillTag({required bool isDark, required IconData icon, required String text}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(30),
+        color: isDark ? Colors.white.withAlpha(16) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontFamily: 'Roboto',
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
+        border: Border.all(
+          color: isDark ? Colors.white.withAlpha(24) : AppTheme.borderSubtle,
+          width: 1,
         ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppTheme.onlineGreen),
+          const Gap(6),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : AppTheme.textDark,
+              letterSpacing: -0.1,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
+

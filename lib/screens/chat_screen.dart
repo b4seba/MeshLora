@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../providers/mesh_provider.dart';
@@ -17,22 +19,59 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  bool _showScrollToBottom = false;
+  int _unreadNewCount = 0;
+  int _previousMessagesCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    final isScrolledUp = _scrollController.offset > 120;
+    if (isScrolledUp != _showScrollToBottom) {
+      setState(() {
+        _showScrollToBottom = isScrolledUp;
+        if (!isScrolledUp) {
+          _unreadNewCount = 0;
+        }
+      });
+    } else if (!isScrolledUp && _unreadNewCount > 0) {
+      setState(() {
+        _unreadNewCount = 0;
+      });
+    }
+  }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
     _textController.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  void _scrollToBottom({bool animate = true}) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+        if (animate) {
+          _scrollController.animateTo(
+            0.0,
+            duration: const Duration(milliseconds: 250),
+            curve: Curves.easeOutCubic,
+          );
+        } else {
+          _scrollController.jumpTo(0.0);
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _showScrollToBottom = false;
+          _unreadNewCount = 0;
+        });
       }
     });
   }
@@ -41,19 +80,23 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _textController.text;
     if (text.trim().isEmpty) return;
 
+    HapticFeedback.lightImpact();
     final provider = context.read<MeshProvider>();
     provider.sendMessage(text);
     _textController.clear();
-    _scrollToBottom();
+    _scrollToBottom(animate: true);
   }
 
   void _handleQuickSend(String quickText) {
+    HapticFeedback.lightImpact();
     final provider = context.read<MeshProvider>();
     provider.sendQuickMessage(quickText);
-    _scrollToBottom();
+    _scrollToBottom(animate: true);
   }
 
   void _showChatOptions(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -63,9 +106,9 @@ class _ChatScreenState extends State<ChatScreen> {
         final isConnected = provider.deviceStatus.isBleConnected;
 
         return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.obsidianCard : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: SafeArea(
             top: false,
@@ -75,58 +118,54 @@ class _ChatScreenState extends State<ChatScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Tirador superior (Drag Handle)
                   Center(
                     child: Container(
-                      width: 44,
-                      height: 5,
+                      width: 36,
+                      height: 4,
                       margin: const EdgeInsets.only(bottom: 18),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFCBD5E0),
-                        borderRadius: BorderRadius.circular(3),
+                        color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-
-                  // Título del Sheet
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'OPCIONES DE MENSAJERÍA',
+                      Text(
+                        'Opciones de Malla',
                         style: TextStyle(
-                          fontFamily: 'Roboto',
                           fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppTheme.navy,
-                          letterSpacing: 0.5,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
                         ),
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: isConnected ? AppTheme.lime.withAlpha(30) : const Color(0xFFEDF2F7),
-                          borderRadius: BorderRadius.circular(12),
+                          color: isConnected
+                              ? (isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight)
+                              : (isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.circular(8),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 7,
-                              height: 7,
+                              width: 6,
+                              height: 6,
                               decoration: BoxDecoration(
-                                color: isConnected ? AppTheme.lime : const Color(0xFFA0AEC0),
+                                color: isConnected ? AppTheme.onlineGreen : AppTheme.textSubtle,
                                 shape: BoxShape.circle,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const Gap(6),
                             Text(
-                              isConnected ? 'ANTENA CONECTADA' : 'DESCONECTADA',
+                              isConnected ? 'Conectado' : 'Desconectado',
                               style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: isConnected ? const Color(0xFF276749) : const Color(0xFFA0AEC0),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: isConnected ? AppTheme.onlineGreen : AppTheme.textSubtle,
                               ),
                             ),
                           ],
@@ -134,13 +173,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const Gap(16),
 
-                  // 1. Cambiar Nombre del Nodo
                   _buildOptionTile(
-                    icon: Icons.badge_rounded,
-                    iconBg: AppTheme.navy.withAlpha(20),
-                    iconColor: AppTheme.navy,
+                    isDark: isDark,
+                    icon: Icons.person_outline_rounded,
+                    iconBg: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight,
+                    iconColor: AppTheme.electricBlue,
                     title: 'Cambiar Nombre del Nodo',
                     subtitle: 'Actualmente: "${provider.userName}"',
                     onTap: () {
@@ -148,13 +187,39 @@ class _ChatScreenState extends State<ChatScreen> {
                       _showEditNameDialog(context);
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const Gap(8),
 
-                  // 2. Consola de Logs
+                  if (isConnected) ...[
+                    _buildOptionTile(
+                      isDark: isDark,
+                      icon: Icons.push_pin_rounded,
+                      iconBg: isDark ? AppTheme.electricBlue.withAlpha(40) : AppTheme.electricBlueLight,
+                      iconColor: AppTheme.electricBlue,
+                      title: 'Fijar Ubicación en Memoria Flash',
+                      subtitle: 'Graba el GPS de tu celular en la antena para funcionar desconectado',
+                      onTap: () async {
+                        Navigator.pop(ctx);
+                        final ok = await provider.saveCurrentLocationToRadioFlash();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(ok
+                                  ? '✅ Ubicación fijada en memoria Flash del WisBlock.'
+                                  : '❌ Error al fijar ubicación en la antena.'),
+                              backgroundColor: ok ? AppTheme.obsidian : AppTheme.redAlert,
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const Gap(8),
+                  ],
+
                   _buildOptionTile(
+                    isDark: isDark,
                     icon: Icons.terminal_rounded,
-                    iconBg: const Color(0xFF00E676).withAlpha(25),
-                    iconColor: const Color(0xFF00C853),
+                    iconBg: isDark ? AppTheme.onlineGreen.withAlpha(40) : const Color(0xFFECFDF5),
+                    iconColor: AppTheme.onlineGreen,
                     title: 'Consola de Logs en Vivo',
                     subtitle: 'Inspecciona paquetes crudos HEX y telemetría BLE',
                     onTap: () {
@@ -165,34 +230,34 @@ class _ChatScreenState extends State<ChatScreen> {
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const Gap(8),
 
-                  // 3. Limpiar historial
                   _buildOptionTile(
-                    icon: Icons.delete_sweep_rounded,
-                    iconBg: const Color(0xFFEDF2F7),
-                    iconColor: const Color(0xFF718096),
-                    title: 'Limpiar Historial de Chat',
-                    subtitle: 'Elimina los mensajes guardados localmente',
+                    isDark: isDark,
+                    icon: Icons.delete_outline_rounded,
+                    iconBg: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+                    iconColor: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                    title: 'Limpiar Historial Local',
+                    subtitle: 'Elimina los mensajes guardados en este dispositivo',
                     onTap: () {
                       Navigator.pop(ctx);
                       provider.clearChatHistory();
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Historial de chat local borrado.'),
-                          backgroundColor: AppTheme.navy,
+                          backgroundColor: AppTheme.obsidian,
                           duration: Duration(seconds: 2),
                         ),
                       );
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const Gap(8),
 
-                  // 4. Desconectar / Conectar Antena
                   if (isConnected)
                     _buildOptionTile(
+                      isDark: isDark,
                       icon: Icons.bluetooth_disabled_rounded,
-                      iconBg: AppTheme.redAlert.withAlpha(25),
+                      iconBg: isDark ? AppTheme.redAlert.withAlpha(40) : AppTheme.redAlertLight,
                       iconColor: AppTheme.redAlert,
                       title: 'Desconectar Antena WisBlock',
                       subtitle: 'Corta el enlace Bluetooth con la radio LoRa',
@@ -204,12 +269,13 @@ class _ChatScreenState extends State<ChatScreen> {
                     )
                   else
                     _buildOptionTile(
+                      isDark: isDark,
                       icon: Icons.bluetooth_searching_rounded,
-                      iconBg: AppTheme.lime.withAlpha(35),
-                      iconColor: AppTheme.lime,
+                      iconBg: isDark ? AppTheme.onlineGreen.withAlpha(40) : AppTheme.onlineGreenLight,
+                      iconColor: AppTheme.onlineGreen,
                       title: 'Vincular / Conectar Antena',
                       subtitle: 'Buscar y enlazar con WisBlock RAK4630',
-                      titleColor: const Color(0xFF276749),
+                      titleColor: AppTheme.onlineGreen,
                       onTap: () {
                         Navigator.pop(ctx);
                         provider.startPairingScan();
@@ -225,6 +291,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildOptionTile({
+    required bool isDark,
     required IconData icon,
     required Color iconBg,
     required Color iconColor,
@@ -234,28 +301,30 @@ class _ChatScreenState extends State<ChatScreen> {
     required VoidCallback onTap,
   }) {
     return Material(
-      color: const Color(0xFFF8FAFC),
-      borderRadius: BorderRadius.circular(16),
+      color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(14),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFEDF2F7)),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
           ),
           child: Row(
             children: [
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: iconBg,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(icon, color: iconColor, size: 22),
+                child: Icon(icon, color: iconColor, size: 20),
               ),
-              const SizedBox(width: 14),
+              const Gap(12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,26 +332,24 @@ class _ChatScreenState extends State<ChatScreen> {
                     Text(
                       title,
                       style: TextStyle(
-                        fontFamily: 'Roboto',
                         fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: titleColor ?? AppTheme.textDark,
+                        fontWeight: FontWeight.w700,
+                        color: titleColor ?? (isDark ? AppTheme.textPrimaryDark : AppTheme.textDark),
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const Gap(2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        fontFamily: 'Roboto',
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: AppTheme.textMuted,
+                        color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFFA0AEC0)),
+              Icon(Icons.chevron_right_rounded, size: 18, color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
             ],
           ),
         ),
@@ -290,73 +357,83 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  Widget _buildHeaderAction({
+    required bool isDark,
+    required String tooltip,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(11),
+          child: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(11),
+              border: Border.all(
+                color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0),
+                width: 1,
+              ),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showEditNameDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.read<MeshProvider>();
     final textController = TextEditingController(text: provider.userName);
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.navy.withAlpha(20),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.badge_rounded, color: AppTheme.navy, size: 22),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Nombre del Nodo',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.navy,
-              ),
-            ),
-          ],
+        title: Text(
+          'Nombre del Nodo',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Este nombre identificará tus mensajes en la malla LoRa:',
               style: TextStyle(
-                fontFamily: 'Roboto',
                 fontSize: 13,
-                color: AppTheme.textMuted,
+                color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
               ),
             ),
-            const SizedBox(height: 14),
+            const Gap(14),
             TextField(
               controller: textController,
               autofocus: true,
               maxLength: 30,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppTheme.textDark,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
               ),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 hintText: 'Ej. Juan P. - Central',
                 counterText: '',
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: AppTheme.navy, width: 2),
-                ),
               ),
             ),
           ],
@@ -365,23 +442,32 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
+            child: Text('Cancelar', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final newName = textController.text.trim();
-              if (newName.isNotEmpty) {
-                provider.updateUserName(newName);
-              }
               Navigator.pop(ctx);
+              if (newName.isNotEmpty) {
+                await provider.updateUserName(newName);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Nombre de nodo actualizado a "$newName"'),
+                      backgroundColor: AppTheme.obsidian,
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.navy,
+              backgroundColor: AppTheme.electricBlue,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
-            child: const Text('GUARDAR', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text('Guardar', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -389,38 +475,26 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _showDisconnectDialog(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppTheme.redAlert.withAlpha(25),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.bluetooth_disabled_rounded, color: AppTheme.redAlert, size: 22),
-            ),
-            const SizedBox(width: 10),
-            const Text(
-              'Desconectar Antena',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 18,
-                fontWeight: FontWeight.w900,
-                color: AppTheme.navy,
-              ),
-            ),
-          ],
+        title: Text(
+          'Desconectar Antena',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+          ),
         ),
-        content: const Text(
+        content: Text(
           '¿Deseas desconectar el enlace Bluetooth con la antena WisBlock RAK4630?\n\nDejarás de recibir telemetría y mensajes en vivo hasta volver a conectarla.',
           style: TextStyle(
-            fontFamily: 'Roboto',
             fontSize: 14,
-            color: AppTheme.textDark,
+            color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
             height: 1.4,
           ),
         ),
@@ -428,7 +502,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('CANCELAR', style: TextStyle(fontWeight: FontWeight.w700, color: AppTheme.textMuted)),
+            child: Text('Cancelar', style: TextStyle(fontWeight: FontWeight.w600, color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -439,7 +513,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Antena WisBlock desconectada.'),
-                    backgroundColor: AppTheme.navy,
+                    backgroundColor: AppTheme.obsidian,
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -449,9 +523,9 @@ class _ChatScreenState extends State<ChatScreen> {
               backgroundColor: AppTheme.redAlert,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
             ),
-            child: const Text('DESCONECTAR', style: TextStyle(fontWeight: FontWeight.w900)),
+            child: const Text('Desconectar', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -460,223 +534,283 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final provider = context.watch<MeshProvider>();
     final messages = provider.messages;
     final activeNeighborsCount = provider.neighbors.where((n) => n.isActive).length;
     final isConnected = provider.deviceStatus.isBleConnected;
 
+    // Detectar si han entrado nuevos mensajes mientras el usuario navega el historial
+    if (messages.length > _previousMessagesCount) {
+      final diff = messages.length - _previousMessagesCount;
+      if (_showScrollToBottom) {
+        _unreadNewCount += diff;
+      }
+      _previousMessagesCount = messages.length;
+    } else if (messages.length < _previousMessagesCount) {
+      _previousMessagesCount = messages.length;
+      _unreadNewCount = 0;
+    }
+
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(74),
-        child: Container(
-          color: AppTheme.navy,
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        toolbarHeight: 68,
+        titleSpacing: 16,
+        elevation: 0,
+        backgroundColor: isDark ? AppTheme.obsidian : Colors.white,
+        title: Row(
+          children: [
+            const MeshLogo(
+              height: 38,
+              fit: BoxFit.contain,
+            ),
+            const Gap(12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const MeshLogo(size: 36),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text(
-                          'Radio-Mesh',
+                  Text(
+                    'Chat',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.3,
+                      color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                    ),
+                  ),
+                  const Gap(2),
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: isConnected ? AppTheme.onlineGreen : (isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
+                          shape: BoxShape.circle,
+                          boxShadow: isConnected
+                              ? [
+                                  BoxShadow(
+                                    color: AppTheme.onlineGreen.withAlpha(100),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
+                      const Gap(6),
+                      Flexible(
+                        child: Text(
+                          isConnected
+                              ? 'Red Activa · $activeNeighborsCount en malla'
+                              : 'Radio Desconectada',
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: Colors.white,
-                            letterSpacing: -0.2,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: isConnected ? AppTheme.onlineGreen : (isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle),
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                color: isConnected ? AppTheme.lime : const Color(0xFFA0AEC0),
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              isConnected
-                                  ? 'RED ACTIVA · $activeNeighborsCount nodos en malla'
-                                  : 'RADIO DESCONECTADA',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 11,
-                                fontWeight: FontWeight.w900,
-                                color: isConnected ? AppTheme.lime : const Color(0xFFA0AEC0),
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Recargar / Sincronizar Malla',
-                    onPressed: () async {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Sincronizando con la radio LoRa...'),
-                          duration: Duration(milliseconds: 900),
-                          backgroundColor: AppTheme.navy,
-                        ),
-                      );
-                      await provider.refreshAllData();
-                    },
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        shape: BoxShape.circle,
                       ),
-                      child: const Icon(
-                        Icons.refresh_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Consola de Logs',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const LogsScreen()),
-                      );
-                    },
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.terminal_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => _showChatOptions(context),
-                    icon: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(30),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.more_vert_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
+                    ],
                   ),
                 ],
               ),
             ),
+          ],
+        ),
+        actions: [
+          _buildHeaderAction(
+            isDark: isDark,
+            tooltip: 'Sincronizar Malla',
+            icon: Icons.refresh_rounded,
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Sincronizando con la radio LoRa...'),
+                  duration: Duration(milliseconds: 900),
+                  backgroundColor: AppTheme.obsidian,
+                ),
+              );
+              await provider.refreshAllData();
+            },
           ),
+          const Gap(6),
+          _buildHeaderAction(
+            isDark: isDark,
+            tooltip: 'Consola de Logs',
+            icon: Icons.terminal_rounded,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const LogsScreen()),
+              );
+            },
+          ),
+          const Gap(6),
+          _buildHeaderAction(
+            isDark: isDark,
+            tooltip: 'Opciones',
+            icon: Icons.more_vert_rounded,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              _showChatOptions(context);
+            },
+          ),
+          const Gap(14),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0)),
         ),
       ),
       body: Column(
         children: [
-          // Stream de Mensajes con Pull-To-Refresh
+          // Stream de Mensajes con Pull-To-Refresh y Comportamiento WhatsApp
           Expanded(
-            child: RefreshIndicator(
-              onRefresh: () => provider.refreshAllData(),
-              color: AppTheme.navy,
-              backgroundColor: AppTheme.lime,
-              child: Container(
-                color: const Color(0xFFF5F7FA),
-                child: messages.isEmpty
-                    ? SingleChildScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        child: SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.55,
-                          child: Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(32),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(20),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withAlpha(10),
-                                          blurRadius: 16,
-                                        ),
-                                      ],
+            child: Stack(
+              children: [
+                RefreshIndicator(
+                  onRefresh: () => provider.refreshAllData(),
+                  color: AppTheme.electricBlue,
+                  backgroundColor: isDark ? AppTheme.obsidianCard : Colors.white,
+                  child: messages.isEmpty
+                      ? SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          child: SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.55,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(32),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(18),
+                                      decoration: BoxDecoration(
+                                        color: isDark ? AppTheme.obsidianCard : Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                                      ),
+                                      child: Icon(
+                                        Icons.chat_bubble_outline_rounded,
+                                        size: 36,
+                                        color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
+                                      ),
                                     ),
-                                    child: const Icon(
-                                      Icons.chat_bubble_outline_rounded,
-                                      size: 48,
-                                      color: Color(0xFFA0AEC0),
+                                    const Gap(16),
+                                    Text(
+                                      'Canal LoRa Vacío',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 20),
-                                  const Text(
-                                    'Canal LoRa Vacío',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      color: AppTheme.textDark,
+                                    const Gap(6),
+                                    Text(
+                                      'Aún no hay mensajes transmitidos en la malla.\nDesliza hacia abajo para refrescar o envía un mensaje rápido.',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w400,
+                                        color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                        height: 1.4,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Aún no hay mensajes transmitidos en la malla. Desliza hacia abajo para refrescar o escribe un mensaje.',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppTheme.textMuted,
-                                      height: 1.4,
-                                    ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
+                        )
+                      : ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          controller: _scrollController,
+                          reverse: true, // Estilo WhatsApp: anclado al último mensaje en la parte inferior
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = messages[messages.length - 1 - index];
+                            return _buildMessageItem(msg, isDark);
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final msg = messages[index];
-                          return _buildMessageItem(msg);
-                        },
+                ),
+
+                // Botón Flotante Estilo WhatsApp de "Bajar al último mensaje" / "Nuevos Mensajes"
+                if (_showScrollToBottom)
+                  Positioned(
+                    right: 16,
+                    bottom: 12,
+                    child: GestureDetector(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        _scrollToBottom(animate: true);
+                      },
+                      child: Container(
+                        padding: _unreadNewCount > 0
+                            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+                            : const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppTheme.obsidianCard : Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(isDark ? 60 : 30),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                          border: Border.all(
+                            color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle,
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 22,
+                              color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                            ),
+                            if (_unreadNewCount > 0) ...[
+                              const Gap(6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.electricBlue,
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '$_unreadNewCount nuevo${_unreadNewCount > 1 ? "s" : ""}',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
-              ),
+                    ),
+                  ),
+              ],
             ),
           ),
 
           // Barra de Acciones Rápidas y Campo de Entrada
           Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: isDark ? AppTheme.obsidianElevated : Colors.white,
               border: Border(
-                top: BorderSide(color: Color(0xFFEDF2F7), width: 1.5),
+                top: BorderSide(color: isDark ? AppTheme.borderDark : AppTheme.borderSubtle, width: 1),
               ),
             ),
             child: SafeArea(
@@ -690,7 +824,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     QuickMessageBar(
                       onQuickMessageTapped: _handleQuickSend,
                     ),
-                    const SizedBox(height: 10),
+                    const Gap(10),
 
                     // Input de Texto y Botón Enviar
                     Padding(
@@ -701,51 +835,38 @@ class _ChatScreenState extends State<ChatScreen> {
                             child: TextField(
                               controller: _textController,
                               maxLength: 200,
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppTheme.textDark,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
                               ),
                               decoration: InputDecoration(
                                 hintText: 'Escribe un mensaje para la malla...',
-                                hintStyle: const TextStyle(
-                                  color: Color(0xFFA0AEC0),
-                                  fontWeight: FontWeight.w500,
+                                hintStyle: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
                                 ),
                                 counterText: '',
-                                filled: true,
-                                fillColor: const Color(0xFFF8FAFC),
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(16),
-                                  borderSide: const BorderSide(color: AppTheme.orange, width: 2),
-                                ),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                               ),
                               onSubmitted: (_) => _handleSend(),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          const Gap(8),
                           Material(
-                            color: AppTheme.orange,
-                            borderRadius: BorderRadius.circular(16),
-                            elevation: 4,
-                            shadowColor: AppTheme.orange.withAlpha(120),
+                            color: AppTheme.electricBlue,
+                            borderRadius: BorderRadius.circular(14),
                             child: InkWell(
                               onTap: _handleSend,
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(14),
                               child: const SizedBox(
-                                width: 54,
-                                height: 50,
+                                width: 48,
+                                height: 48,
                                 child: Center(
                                   child: Icon(
                                     Icons.send_rounded,
                                     color: Colors.white,
-                                    size: 24,
+                                    size: 20,
                                   ),
                                 ),
                               ),
@@ -764,7 +885,7 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessageItem(ChatMessage msg) {
+  Widget _buildMessageItem(ChatMessage msg, bool isDark) {
     if (msg.fromMe) {
       return Padding(
         padding: const EdgeInsets.only(bottom: 12),
@@ -777,42 +898,33 @@ class _ChatScreenState extends State<ChatScreen> {
               ),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.navy,
+                color: isDark ? AppTheme.electricBlue : AppTheme.obsidian,
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  topRight: Radius.circular(18),
-                  bottomLeft: Radius.circular(18),
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                  bottomLeft: Radius.circular(16),
                   bottomRight: Radius.circular(4),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(12),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
               ),
               child: Text(
                 msg.text,
                 style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                   color: Colors.white,
-                  height: 1.3,
+                  height: 1.35,
                 ),
               ),
             ),
-            const SizedBox(height: 3),
+            const Gap(3),
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Text(
                 '${msg.formattedTime} · Emitido por LoRa',
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: AppTheme.textMuted,
+                  color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
                 ),
               ),
             ),
@@ -826,10 +938,9 @@ class _ChatScreenState extends State<ChatScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Avatar Circular con Iniciales
           Container(
-            width: 38,
-            height: 38,
+            width: 34,
+            height: 34,
             margin: const EdgeInsets.only(bottom: 18),
             decoration: BoxDecoration(
               color: msg.avatarColor,
@@ -839,17 +950,15 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Text(
                 msg.initials,
                 style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const Gap(8),
 
-          // Burbuja de Mensaje Recibido
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -859,9 +968,8 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: Text(
                     msg.name,
                     style: TextStyle(
-                      fontFamily: 'Roboto',
                       fontSize: 12,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: msg.avatarColor,
                     ),
                   ),
@@ -869,24 +977,17 @@ class _ChatScreenState extends State<ChatScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? AppTheme.obsidianCard : Colors.white,
                     borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(18),
-                      topRight: Radius.circular(18),
-                      bottomRight: Radius.circular(18),
+                      topLeft: Radius.circular(16),
+                      topRight: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
                       bottomLeft: Radius.circular(4),
                     ),
                     border: Border.all(
-                      color: msg.isUrgent ? AppTheme.redAlert : const Color(0xFFE2E8F0),
-                      width: msg.isUrgent ? 2 : 1,
+                      color: msg.isUrgent ? AppTheme.redAlert : (isDark ? AppTheme.borderDark : AppTheme.borderSubtle),
+                      width: msg.isUrgent ? 1.5 : 1,
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(8),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -896,51 +997,48 @@ class _ChatScreenState extends State<ChatScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Container(
-                              width: 8,
-                              height: 8,
+                              width: 6,
+                              height: 6,
                               decoration: const BoxDecoration(
                                 color: AppTheme.redAlert,
                                 shape: BoxShape.circle,
                               ),
                             ),
-                            const SizedBox(width: 6),
+                            const Gap(6),
                             const Text(
                               'URGENTE / SOS',
                               style: TextStyle(
-                                fontFamily: 'Roboto',
                                 fontSize: 11,
-                                fontWeight: FontWeight.w900,
+                                fontWeight: FontWeight.w800,
                                 color: AppTheme.redAlert,
-                                letterSpacing: 0.5,
+                                letterSpacing: 0.3,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const Gap(6),
                       ],
                       Text(
                         msg.text,
-                        style: const TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textDark,
-                          height: 1.3,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                          height: 1.35,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 3),
+                const Gap(3),
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Text(
                     '${msg.formattedTime}${msg.rssiDbm != null ? ' · RSSI ${msg.rssiDbm} dBm' : ''}${msg.snr != null ? ' · SNR ${msg.snr!.toStringAsFixed(1)} dB' : ''}',
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
-                      color: AppTheme.textMuted,
+                      color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
                     ),
                   ),
                 ),
@@ -952,3 +1050,4 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
+

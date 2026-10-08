@@ -68,6 +68,7 @@ class BleService {
   Stream<List<DiscoveredRadioDevice>> get discoveredDevicesStream => _discoveredDevicesController.stream;
 
   BleConnectionState get currentState => _currentState;
+  bool get isConnected => _currentState == BleConnectionState.connected;
   int get myNodeNum => _myNodeNum;
   String get connectedDeviceName => _connectedDevice?.platformName.isNotEmpty == true
       ? _connectedDevice!.platformName
@@ -665,6 +666,154 @@ class BleService {
       return true;
     } catch (e) {
       _logger.error('GPS TX', 'Error transmitiendo ubicación GPS: $e');
+      return false;
+    }
+  }
+
+  /// Configura el nombre del nodo en la memoria flash/NVS del WisBlock y lo difunde a la malla LoRa
+  Future<bool> setNodeOwner({
+    required String longName,
+    String? shortName,
+  }) async {
+    if (_currentState != BleConnectionState.connected || _toRadioCharacteristic == null) {
+      _logger.warn('NOMBRE NODO', 'No se puede cambiar el nombre: WisBlock desconectado.');
+      return false;
+    }
+
+    try {
+      final cleanLong = longName.trim();
+      String effectiveShort = (shortName ?? '').trim();
+
+      if (effectiveShort.isEmpty) {
+        final words = cleanLong.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
+        if (words.length >= 2) {
+          effectiveShort = words.take(4).map((w) => w[0].toUpperCase()).join();
+        } else if (cleanLong.length >= 4) {
+          effectiveShort = cleanLong.substring(0, 4).toUpperCase();
+        } else {
+          effectiveShort = cleanLong.toUpperCase();
+        }
+      }
+
+      if (effectiveShort.length > 4) {
+        effectiveShort = effectiveShort.substring(0, 4);
+      }
+
+      // 1. Paquete AdminMessage.set_owner para guardar en NVS del hardware
+      final adminPacket = MeshtasticProtocol.buildSetOwnerPacket(
+        longName: cleanLong,
+        shortName: effectiveShort,
+        myNodeNum: _myNodeNum,
+      );
+
+      // 2. Paquete NODEINFO_APP para difundir inmediatamente por la malla LoRa
+      final nodeInfoPacket = MeshtasticProtocol.buildNodeInfoPacket(
+        longName: cleanLong,
+        shortName: effectiveShort,
+        myNodeNum: _myNodeNum,
+      );
+
+      final canWriteNoResp = _toRadioCharacteristic!.properties.writeWithoutResponse;
+      final canWriteWithResp = _toRadioCharacteristic!.properties.write;
+
+      // Enviar comando admin al hardware local
+      await _toRadioCharacteristic!.write(
+        adminPacket,
+        withoutResponse: canWriteNoResp || !canWriteWithResp,
+        timeout: 4,
+      );
+
+      await Future.delayed(const Duration(milliseconds: 150));
+
+      // Difundir NodeInfo por la malla
+      await _toRadioCharacteristic!.write(
+        nodeInfoPacket,
+        withoutResponse: canWriteNoResp || !canWriteWithResp,
+        timeout: 4,
+      );
+
+      final hex = adminPacket.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      _logger.info('NOMBRE NODO', '🏷️ Nombre de nodo grabado en WisBlock y transmitido a la malla: "$cleanLong" [$effectiveShort]', hex);
+      return true;
+    } catch (e) {
+      _logger.error('NOMBRE NODO', 'Error configurando nombre en WisBlock: $e');
+      return false;
+    }
+  }
+
+  /// Graba una posición fija (Fixed Position) en la memoria Flash/NVS del nodo WisBlock.
+  /// Esto hace que el nodo continúe transmitiendo las coordenadas reales del celular
+  /// de manera autónoma por la malla LoRa incluso después de desconectar el Bluetooth.
+  Future<bool> setFixedPosition({
+    required double latitude,
+    required double longitude,
+    int? altitude,
+  }) async {
+    if (_currentState != BleConnectionState.connected || _toRadioCharacteristic == null) {
+      _logger.warn('POSICIÓN FIJA', 'No se puede fijar ubicación: WisBlock desconectado.');
+      return false;
+    }
+
+    try {
+      final packet = MeshtasticProtocol.buildSetFixedPositionPacket(
+        latitude: latitude,
+        longitude: longitude,
+        altitude: altitude,
+        myNodeNum: _myNodeNum,
+      );
+
+      final canWriteNoResp = _toRadioCharacteristic!.properties.writeWithoutResponse;
+      final canWriteWithResp = _toRadioCharacteristic!.properties.write;
+
+      await _toRadioCharacteristic!.write(
+        packet,
+        withoutResponse: canWriteNoResp || !canWriteWithResp,
+        timeout: 4,
+      );
+
+      final hex = packet.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      _logger.gps(
+        'POSICIÓN FIJA FLASH',
+        '📍 Ubicación grabada en memoria FLASH de la antena WisBlock:\n'
+        '   • Lat: ${latitude.toStringAsFixed(6)}\n'
+        '   • Lon: ${longitude.toStringAsFixed(6)}\n'
+        '   • Alt: ${altitude ?? 0}m\n'
+        '   • La antena mantendrá esta posición de forma autónoma al desconectar el celular.',
+        hex,
+      );
+      return true;
+    } catch (e) {
+      _logger.error('POSICIÓN FIJA', 'Error grabando posición fija en Flash del nodo: $e');
+      return false;
+    }
+  }
+
+  /// Elimina la posición fija guardada en la memoria Flash/NVS de la radio WisBlock.
+  Future<bool> removeFixedPosition() async {
+    if (_currentState != BleConnectionState.connected || _toRadioCharacteristic == null) {
+      _logger.warn('POSICIÓN FIJA', 'No se puede borrar posición fija: WisBlock desconectado.');
+      return false;
+    }
+
+    try {
+      final packet = MeshtasticProtocol.buildRemoveFixedPositionPacket(
+        myNodeNum: _myNodeNum,
+      );
+
+      final canWriteNoResp = _toRadioCharacteristic!.properties.writeWithoutResponse;
+      final canWriteWithResp = _toRadioCharacteristic!.properties.write;
+
+      await _toRadioCharacteristic!.write(
+        packet,
+        withoutResponse: canWriteNoResp || !canWriteWithResp,
+        timeout: 4,
+      );
+
+      final hex = packet.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+      _logger.info('POSICIÓN FIJA', '🧹 Posición fija eliminada de la memoria Flash del WisBlock.', hex);
+      return true;
+    } catch (e) {
+      _logger.error('POSICIÓN FIJA', 'Error eliminando posición fija de Flash: $e');
       return false;
     }
   }

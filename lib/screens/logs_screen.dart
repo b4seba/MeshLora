@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gap/gap.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../services/radio_logger.dart';
@@ -40,27 +42,28 @@ class _LogsScreenState extends State<LogsScreen> {
   Color _getColorForType(LogType type) {
     switch (type) {
       case LogType.gps:
-        return const Color(0xFF00E676); // Verde brillante / GPS
+        return const Color(0xFF10B981);
       case LogType.loraRx:
-        return const Color(0xFF69F0AE); // Verde menta
+        return const Color(0xFF34D399);
       case LogType.loraTx:
-        return const Color(0xFF2979FF); // Azul
+        return const Color(0xFF60A5FA);
       case LogType.telemetry:
-        return const Color(0xFFFFD600); // Amarillo
+        return const Color(0xFFFBBF24);
       case LogType.node:
-        return const Color(0xFF00E5FF); // Cyan
+        return const Color(0xFF38BDF8);
       case LogType.ble:
-        return const Color(0xFFB388FF); // Púrpura
+        return const Color(0xFFA78BFA);
       case LogType.warning:
-        return const Color(0xFFFF9100); // Naranja
+        return const Color(0xFFFB923C);
       case LogType.error:
-        return const Color(0xFFFF5252); // Rojo
+        return const Color(0xFFF87171);
       case LogType.info:
-        return const Color(0xFF9E9E9E); // Gris claro
+        return const Color(0xFF94A3B8);
     }
   }
 
   void _copyAllLogs() {
+    HapticFeedback.lightImpact();
     final all = _logger.logs
         .map((l) => '${l.timeFormatted} ${l.typeEmoji} ${l.tag}: ${l.message}${l.rawHex != null ? " [HEX: ${l.rawHex}]" : ""}')
         .join('\n');
@@ -69,7 +72,7 @@ class _LogsScreenState extends State<LogsScreen> {
       const SnackBar(
         content: Text('Logs copiados al portapapeles'),
         duration: Duration(seconds: 2),
-        backgroundColor: AppTheme.navy,
+        backgroundColor: AppTheme.obsidian,
       ),
     );
   }
@@ -77,10 +80,12 @@ class _LogsScreenState extends State<LogsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1D),
+      backgroundColor: const Color(0xFF070B14),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF10192C),
+        backgroundColor: const Color(0xFF0D1527),
+        foregroundColor: Colors.white,
         elevation: 0,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
           onPressed: () => Navigator.pop(context),
@@ -88,39 +93,35 @@ class _LogsScreenState extends State<LogsScreen> {
         title: Row(
           children: [
             Container(
-              width: 10,
-              height: 10,
+              width: 8,
+              height: 8,
               decoration: const BoxDecoration(
-                color: Color(0xFF00E676),
+                color: AppTheme.onlineGreen,
                 shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: 8),
-            const Flexible(
-              child: Text(
-                'LOGS DE ANTENA',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-                overflow: TextOverflow.ellipsis,
+            const Gap(8),
+            const Text(
+              'Logs de Antena WisBlock',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
               ),
             ),
           ],
         ),
         actions: [
           IconButton(
-            tooltip: 'Sincronizar antena / Forzar lectura',
-            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+            tooltip: 'Sincronizar antena',
+            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
             onPressed: () async {
+              HapticFeedback.lightImpact();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Sincronizando y vaciando buffer de la radio...'),
                   duration: Duration(milliseconds: 900),
-                  backgroundColor: AppTheme.navy,
+                  backgroundColor: AppTheme.obsidian,
                 ),
               );
               await context.read<MeshProvider>().refreshAllData();
@@ -129,10 +130,12 @@ class _LogsScreenState extends State<LogsScreen> {
           IconButton(
             tooltip: _autoScroll ? 'Pausar auto-scroll' : 'Activar auto-scroll',
             icon: Icon(
-              _autoScroll ? Icons.arrow_downward_rounded : Icons.pause_circle_outline_rounded,
-              color: _autoScroll ? const Color(0xFF00E676) : Colors.white54,
+              _autoScroll ? Icons.arrow_circle_down_rounded : Icons.pause_circle_outline_rounded,
+              color: _autoScroll ? AppTheme.onlineGreen : Colors.white54,
+              size: 20,
             ),
             onPressed: () {
+              HapticFeedback.lightImpact();
               setState(() {
                 _autoScroll = !_autoScroll;
               });
@@ -146,39 +149,45 @@ class _LogsScreenState extends State<LogsScreen> {
           ),
           IconButton(
             tooltip: 'Limpiar logs',
-            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.white54, size: 22),
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.white54, size: 20),
             onPressed: () {
+              HapticFeedback.lightImpact();
               setState(() {
                 _logger.clear();
               });
             },
           ),
+          const Gap(4),
         ],
+        bottom: const PreferredSize(
+          preferredSize: Size.fromHeight(1),
+          child: Divider(height: 1, color: Color(0xFF1E293B)),
+        ),
       ),
       body: Column(
         children: [
           // Barra de Filtros
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            color: const Color(0xFF131D33),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            color: const Color(0xFF0D1527),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
                   _buildFilterChip('Todos', null),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('📍 GPS', LogType.gps),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('📥 LoRa RX', LogType.loraRx),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('🚀 LoRa TX', LogType.loraTx),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('⚡ Telemetría', LogType.telemetry),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('📡 Nodos', LogType.node),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('🔵 BLE', LogType.ble),
-                  const SizedBox(width: 6),
+                  const Gap(6),
                   _buildFilterChip('❌ Errores', LogType.error),
                 ],
               ),
@@ -189,8 +198,8 @@ class _LogsScreenState extends State<LogsScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () => context.read<MeshProvider>().refreshAllData(),
-              color: AppTheme.navy,
-              backgroundColor: AppTheme.lime,
+              color: AppTheme.electricBlue,
+              backgroundColor: const Color(0xFF0D1527),
               child: StreamBuilder<RadioLogEntry>(
                 stream: _logger.logStream,
                 builder: (context, snapshot) {
@@ -211,14 +220,13 @@ class _LogsScreenState extends State<LogsScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.terminal_rounded, size: 56, color: Colors.white.withAlpha(50)),
-                              const SizedBox(height: 12),
+                              Icon(Icons.terminal_rounded, size: 48, color: Colors.white.withAlpha(40)),
+                              const Gap(14),
                               Text(
                                 'Esperando tráfico de la antena WisBlock...\nDesliza hacia abajo para forzar sincronización.',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   color: Colors.white.withAlpha(120),
                                   height: 1.4,
                                 ),
@@ -243,8 +251,8 @@ class _LogsScreenState extends State<LogsScreen> {
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF101726),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFF0F172A),
+                          borderRadius: BorderRadius.circular(10),
                           border: Border.all(
                             color: typeColor.withAlpha(40),
                             width: 1,
@@ -257,38 +265,35 @@ class _LogsScreenState extends State<LogsScreen> {
                               children: [
                                 Text(
                                   log.timeFormatted,
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
+                                  style: GoogleFonts.jetBrainsMono(
                                     fontSize: 11,
-                                    color: Color(0xFF7E8B9B),
-                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF94A3B8),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const Gap(8),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: typeColor.withAlpha(35),
+                                    color: typeColor.withAlpha(30),
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     log.typeEmoji,
                                     style: TextStyle(
-                                      fontFamily: 'monospace',
                                       fontSize: 10,
-                                      fontWeight: FontWeight.w900,
+                                      fontWeight: FontWeight.w700,
                                       color: typeColor,
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 6),
+                                const Gap(6),
                                 Expanded(
                                   child: Text(
                                     log.tag,
                                     style: TextStyle(
-                                      fontFamily: 'Roboto',
                                       fontSize: 11,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w600,
                                       color: typeColor,
                                     ),
                                     overflow: TextOverflow.ellipsis,
@@ -296,30 +301,28 @@ class _LogsScreenState extends State<LogsScreen> {
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 6),
+                            const Gap(6),
                             Text(
                               log.message,
-                              style: const TextStyle(
-                                fontFamily: 'monospace',
+                              style: GoogleFonts.jetBrainsMono(
                                 fontSize: 12,
-                                color: Color(0xFFE2E8F0),
+                                color: const Color(0xFFE2E8F0),
                                 height: 1.35,
                               ),
                             ),
                             if (log.rawHex != null && log.rawHex!.isNotEmpty) ...[
-                              const SizedBox(height: 6),
+                              const Gap(6),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.black.withAlpha(120),
-                                  borderRadius: BorderRadius.circular(4),
+                                  color: Colors.black.withAlpha(140),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: Text(
                                   'HEX: ${log.rawHex}',
-                                  style: const TextStyle(
-                                    fontFamily: 'monospace',
+                                  style: GoogleFonts.jetBrainsMono(
                                     fontSize: 10,
-                                    color: Color(0xFF90CAF9),
+                                    color: const Color(0xFF93C5FD),
                                   ),
                                 ),
                               ),
@@ -342,26 +345,27 @@ class _LogsScreenState extends State<LogsScreen> {
     final isSelected = _selectedFilter == type;
     return GestureDetector(
       onTap: () {
+        HapticFeedback.lightImpact();
         setState(() {
           _selectedFilter = type;
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? AppTheme.lime : const Color(0xFF1E293B),
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppTheme.electricBlue : const Color(0xFF1E293B),
+          borderRadius: BorderRadius.circular(16),
         ),
         child: Text(
           label,
           style: TextStyle(
-            fontFamily: 'Roboto',
             fontSize: 11,
-            fontWeight: isSelected ? FontWeight.w900 : FontWeight.w600,
-            color: isSelected ? AppTheme.navy : Colors.white70,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : Colors.white70,
           ),
         ),
       ),
     );
   }
 }
+

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:gap/gap.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import '../models/neighbor_node.dart';
@@ -58,7 +59,6 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
         provider.currentGpsPosition!.longitude,
       );
     }
-    // Si no está en el provider, buscar en el nodo marcado como isMe
     for (final n in widget.neighbors) {
       if (n.isMe && n.latitude != null && n.longitude != null) {
         return LatLng(n.latitude!, n.longitude!);
@@ -69,11 +69,13 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
 
   void _centerOnMe(LatLng? myPos) {
     if (myPos != null) {
+      HapticFeedback.lightImpact();
       _mapController.move(myPos, 16.0);
     }
   }
 
   void _fitAllNodes(LatLng? myPos, List<NeighborNode> nodesWithGps) {
+    HapticFeedback.lightImpact();
     final points = <LatLng>[];
     if (myPos != null) points.add(myPos);
     for (final n in nodesWithGps) {
@@ -105,7 +107,6 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
     final nodesWithGps = widget.neighbors.where((n) => !n.isMe && n.latitude != null && n.longitude != null).toList();
     final nodesWithoutGps = widget.neighbors.where((n) => !n.isMe && (n.latitude == null || n.longitude == null)).toList();
 
-    // Centrar automáticamente en la primera fijación de GPS
     if (!_hasInitialCentered && myPos != null) {
       _hasInitialCentered = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -113,7 +114,6 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
       });
     }
 
-    // Coordenada inicial por defecto (Santiago, Chile o posición del usuario)
     final initialCenter = myPos ??
         (nodesWithGps.isNotEmpty
             ? LatLng(nodesWithGps.first.latitude!, nodesWithGps.first.longitude!)
@@ -121,7 +121,7 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
 
     return Stack(
       children: [
-        // 1. Mapa Real OpenStreetMap
+        // 1. OpenStreetMap
         FlutterMap(
           mapController: _mapController,
           options: MapOptions(
@@ -136,41 +136,38 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
             },
           ),
           children: [
-            // Capa de teselas OpenStreetMap
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'cl.uautonoma.radiomesh.radio_mesh',
               maxZoom: 19,
             ),
 
-            // Enlaces LoRa (Líneas discontinuas entre mi nodo y vecinos con GPS)
             if (myPos != null)
               PolylineLayer(
                 polylines: nodesWithGps.map((n) {
                   return Polyline(
                     points: [myPos, LatLng(n.latitude!, n.longitude!)],
-                    strokeWidth: 2.5,
-                    pattern: StrokePattern.dashed(segments: [8, 6]),
-                    color: n.color.withAlpha(200),
+                    strokeWidth: 2.0,
+                    pattern: StrokePattern.dashed(segments: [6, 4]),
+                    color: AppTheme.electricBlue.withAlpha(180),
                   );
                 }).toList(),
               ),
 
-            // Halo animado de radar alrededor de mi ubicación
             if (myPos != null)
               AnimatedBuilder(
                 animation: _pulseController,
                 builder: (context, _) {
                   final radiusMeters = 20.0 + (_pulseController.value * 40.0);
-                  final alpha = ((1.0 - _pulseController.value) * 120).toInt();
+                  final alpha = ((1.0 - _pulseController.value) * 100).toInt();
                   return CircleLayer(
                     circles: [
                       CircleMarker(
                         point: myPos,
                         radius: radiusMeters,
                         useRadiusInMeter: true,
-                        color: AppTheme.lime.withAlpha(alpha),
-                        borderColor: AppTheme.lime.withAlpha(alpha + 40),
+                        color: AppTheme.onlineGreen.withAlpha(alpha),
+                        borderColor: AppTheme.onlineGreen.withAlpha(alpha + 30),
                         borderStrokeWidth: 1.5,
                       ),
                     ],
@@ -178,10 +175,8 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                 },
               ),
 
-            // Marcadores de Nodos en Coordenadas Reales
             MarkerLayer(
               markers: [
-                // Marcador "Mi Nodo" (Yo)
                 if (myPos != null)
                   Marker(
                     point: myPos,
@@ -191,7 +186,6 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                     child: _buildMyNodeMarker(provider.userName),
                   ),
 
-                // Marcadores de Nodos Vecinos de la Malla
                 ...nodesWithGps.map((neighbor) {
                   return Marker(
                     point: LatLng(neighbor.latitude!, neighbor.longitude!),
@@ -214,30 +208,30 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
           child: _buildTopStatusPill(provider, nodesWithGps.length, nodesWithoutGps.length),
         ),
 
-        // 3. Aviso Informativo si no hay señal satelital aún
+        // 3. Aviso Informativo si no hay señal GPS aún
         if (myPos == null && nodesWithGps.isEmpty)
           Positioned(
             top: 76,
-            left: 16,
-            right: 16,
+            left: 14,
+            right: 14,
             child: _buildNoGpsNoticeCard(provider),
           ),
 
-        // 4. Botones Flotantes de Acción y Navegación
+        // 4. Botones Flotantes de Acción
         Positioned(
-          bottom: _selectedNode != null ? 220 : 24,
-          right: 16,
+          bottom: _selectedNode != null ? 240 : 20,
+          right: 14,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Botón Emitir Posición LoRa
-              _buildFloatingActionButton(
+              _buildFloatingButton(
                 icon: Icons.satellite_alt_rounded,
                 tooltip: 'Emitir mi GPS por LoRa',
-                color: AppTheme.lime,
-                iconColor: AppTheme.navy,
+                color: AppTheme.electricBlue,
+                iconColor: Colors.white,
                 isLoading: provider.isBroadcastingGps,
                 onPressed: () async {
+                  HapticFeedback.lightImpact();
                   final ok = await provider.broadcastMyLocation();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -247,59 +241,57 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                               ? '📍 Ubicación GPS transmitida a la malla LoRa.'
                               : '⚠️ No se pudo emitir la ubicación (${provider.gpsStatusMessage})',
                         ),
-                        backgroundColor: ok ? AppTheme.navy : AppTheme.redAlert,
+                        backgroundColor: ok ? AppTheme.obsidian : AppTheme.redAlert,
                         duration: const Duration(seconds: 3),
                       ),
                     );
                   }
                 },
               ),
-              const SizedBox(height: 10),
+              const Gap(8),
 
-              // Botón Centrar en Mí
               if (myPos != null) ...[
-                _buildFloatingActionButton(
+                _buildFloatingButton(
                   icon: Icons.my_location_rounded,
                   tooltip: 'Centrar en mi ubicación',
                   color: Colors.white,
-                  iconColor: AppTheme.navy,
+                  iconColor: AppTheme.textDark,
                   onPressed: () => _centerOnMe(myPos),
                 ),
-                const SizedBox(height: 10),
+                const Gap(8),
               ],
 
-              // Botón Encuadre Total (Fit All)
               if (nodesWithGps.isNotEmpty) ...[
-                _buildFloatingActionButton(
-                  icon: Icons.filter_center_focus_rounded,
+                _buildFloatingButton(
+                  icon: Icons.fit_screen_rounded,
                   tooltip: 'Encuadrar todos los nodos',
                   color: Colors.white,
-                  iconColor: AppTheme.navy,
+                  iconColor: AppTheme.textDark,
                   onPressed: () => _fitAllNodes(myPos, nodesWithGps),
                 ),
-                const SizedBox(height: 10),
+                const Gap(8),
               ],
 
-              // Zoom In
-              _buildFloatingActionButton(
-                icon: Icons.add,
+              _buildFloatingButton(
+                icon: Icons.add_rounded,
                 tooltip: 'Acercar',
                 color: Colors.white,
-                iconColor: AppTheme.navy,
+                iconColor: AppTheme.textDark,
                 onPressed: () {
+                  HapticFeedback.lightImpact();
                   final z = _mapController.camera.zoom;
                   _mapController.move(_mapController.camera.center, math.min(z + 1.0, 19.0));
                 },
               ),
-              const SizedBox(height: 8),
+              const Gap(6),
 
-              // Zoom Out
-              _buildFloatingActionButton(
-                icon: Icons.remove,
+              _buildFloatingButton(
+                icon: Icons.remove_rounded,
                 tooltip: 'Alejar',
                 color: Colors.white,
-                iconColor: AppTheme.navy,
+                iconColor: AppTheme.textDark,
                 onPressed: () {
+                  HapticFeedback.lightImpact();
                   final z = _mapController.camera.zoom;
                   _mapController.move(_mapController.camera.center, math.max(z - 1.0, 3.0));
                 },
@@ -311,7 +303,7 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
         // 5. Tarjeta de Detalle del Nodo Seleccionado
         if (_selectedNode != null)
           Positioned(
-            bottom: 16,
+            bottom: 14,
             left: 14,
             right: 14,
             child: _buildNodeDetailCard(_selectedNode!),
@@ -320,22 +312,18 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Widgets de Marcadores Cartográficos
-  // ---------------------------------------------------------------------------
-
   Widget _buildMyNodeMarker(String userName) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
           decoration: BoxDecoration(
-            color: AppTheme.navy,
-            borderRadius: BorderRadius.circular(10),
+            color: AppTheme.obsidian,
+            borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(60),
+                color: Colors.black.withAlpha(40),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),
@@ -345,33 +333,33 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
             'Yo ($userName)',
             style: const TextStyle(
               fontSize: 10,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        const SizedBox(height: 2),
+        const Gap(2),
         Container(
-          width: 34,
-          height: 34,
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: AppTheme.lime,
+            color: AppTheme.onlineGreen,
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
+            border: Border.all(color: Colors.white, width: 2.5),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withAlpha(70),
+                color: Colors.black.withAlpha(40),
                 blurRadius: 6,
-                offset: const Offset(0, 3),
+                offset: const Offset(0, 2),
               ),
             ],
           ),
           child: const Icon(
-            Icons.person,
-            size: 20,
-            color: AppTheme.navy,
+            Icons.person_rounded,
+            size: 16,
+            color: Colors.white,
           ),
         ),
       ],
@@ -383,23 +371,24 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
 
     return GestureDetector(
       onTap: () {
+        HapticFeedback.lightImpact();
         setState(() => _selectedNode = neighbor);
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: isSelected ? AppTheme.navy : Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              color: isSelected ? AppTheme.obsidian : Colors.white,
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? AppTheme.lime : const Color(0xFFCBD5E1),
+                color: isSelected ? AppTheme.electricBlue : AppTheme.borderSubtle,
                 width: isSelected ? 1.5 : 1.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(50),
+                  color: Colors.black.withAlpha(30),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -409,20 +398,20 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 7,
-                  height: 7,
+                  width: 6,
+                  height: 6,
                   decoration: BoxDecoration(
-                    color: neighbor.isActive ? const Color(0xFF10B981) : const Color(0xFF94A3B8),
+                    color: neighbor.isActive ? AppTheme.onlineGreen : AppTheme.textSubtle,
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 4),
+                const Gap(4),
                 Text(
                   neighbor.shortDisplayName,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: isSelected ? Colors.white : AppTheme.navy,
+                    color: isSelected ? Colors.white : AppTheme.textDark,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -430,22 +419,22 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
               ],
             ),
           ),
-          const SizedBox(height: 2),
+          const Gap(2),
           Container(
-            width: 36,
-            height: 36,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
               color: neighbor.color,
               shape: BoxShape.circle,
               border: Border.all(
-                color: isSelected ? AppTheme.lime : Colors.white,
-                width: isSelected ? 3.5 : 2.5,
+                color: isSelected ? AppTheme.electricBlue : Colors.white,
+                width: isSelected ? 3.0 : 2.0,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withAlpha(60),
+                  color: Colors.black.withAlpha(40),
                   blurRadius: 6,
-                  offset: const Offset(0, 3),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -454,7 +443,7 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                 neighbor.initials,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   fontSize: 12,
                 ),
               ),
@@ -465,19 +454,16 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Componentes de Interfaz Superior e Inferior
-  // ---------------------------------------------------------------------------
-
   Widget _buildTopStatusPill(MeshProvider provider, int withGps, int withoutGps) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(240),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderSubtle),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(30),
+            color: Colors.black.withAlpha(15),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -486,14 +472,14 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
       child: Row(
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 8,
+            height: 8,
             decoration: BoxDecoration(
-              color: provider.isGpsActive ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+              color: provider.isGpsActive ? AppTheme.onlineGreen : AppTheme.warningAmber,
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 8),
+          const Gap(10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,18 +488,18 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                 Text(
                   provider.gpsStatusMessage,
                   style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textDark,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
                   '$withGps en mapa • $withoutGps sin coordenadas',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.grey.shade600,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textMuted,
                   ),
                 ),
               ],
@@ -525,7 +511,7 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
               height: 16,
               child: CircularProgressIndicator(
                 strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.navy),
+                valueColor: AlwaysStoppedAnimation<Color>(AppTheme.electricBlue),
               ),
             ),
         ],
@@ -540,29 +526,22 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
         color: const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: const Color(0xFFFDE68A)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withAlpha(20),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
-        children: [
-          const Icon(
+        children: const [
+          Icon(
             Icons.info_outline_rounded,
             color: Color(0xFFD97706),
-            size: 22,
+            size: 18,
           ),
-          const SizedBox(width: 10),
+          Gap(10),
           Expanded(
             child: Text(
-              'Toca "Emitir mi GPS" para inyectar la ubicación de este teléfono a la antena y que el otro nodo te vea en el mapa.',
+              'Toca "Emitir mi GPS" para inyectar tu posición y que otros nodos te vean en el mapa.',
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: Colors.amber.shade900,
+                color: Color(0xFF92400E),
               ),
             ),
           ),
@@ -576,10 +555,11 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.borderSubtle),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withAlpha(50),
+            color: Colors.black.withAlpha(20),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -589,12 +569,11 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fila Superior: Nombre, ID y botón cerrar
           Row(
             children: [
               Container(
-                width: 38,
-                height: 38,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: node.color,
                   shape: BoxShape.circle,
@@ -604,13 +583,13 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                     node.initials,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const Gap(10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -619,158 +598,111 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
                       node.name,
                       style: const TextStyle(
                         fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        color: AppTheme.navy,
+                        fontWeight: FontWeight.w700,
+                        color: AppTheme.textDark,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       '${node.id} • ${node.lastSeenFormatted}',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: AppTheme.textMuted,
                       ),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, size: 20),
+                icon: const Icon(Icons.close_rounded, size: 18, color: AppTheme.textMuted),
                 onPressed: () => setState(() => _selectedNode = null),
               ),
             ],
           ),
-          const Divider(height: 20),
+          const Divider(height: 16),
 
-          // Fila de Métricas Reales
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildMetricItem(
-                icon: Icons.straighten_rounded,
+                icon: Icons.navigation_rounded,
                 label: 'DISTANCIA',
                 value: node.distance,
-                color: AppTheme.navy,
+                color: AppTheme.electricBlue,
               ),
               _buildMetricItem(
-                icon: Icons.battery_charging_full_rounded,
+                icon: Icons.battery_5_bar_rounded,
                 label: 'BATERÍA',
                 value: '${node.batteryPercent}%',
-                color: const Color(0xFF10B981),
+                color: AppTheme.onlineGreen,
               ),
               _buildMetricItem(
-                icon: Icons.network_check_rounded,
+                icon: Icons.signal_cellular_alt_rounded,
                 label: 'SNR LORA',
                 value: node.snr != null ? '${node.snr!.toStringAsFixed(1)} dB' : 'N/A',
-                color: const Color(0xFF3B82F6),
+                color: AppTheme.textDark,
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const Gap(10),
 
-          // Badge de precisión GPS
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: (node.isMe || node.isHighPrecision)
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: (node.isMe || node.isHighPrecision)
-                        ? const Color(0xFF86EFAC)
-                        : const Color(0xFFFCD34D),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      (node.isMe || node.isHighPrecision)
-                          ? Icons.check_circle_rounded
-                          : Icons.warning_amber_rounded,
-                      size: 13,
-                      color: (node.isMe || node.isHighPrecision)
-                          ? const Color(0xFF15803D)
-                          : const Color(0xFFB45309),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      (node.isMe || node.isHighPrecision)
-                          ? 'GPS Exacto (100% Real)'
-                          : 'GPS Canal Meshtastic (${node.precisionBits}b: ~1.9 km)',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: (node.isMe || node.isHighPrecision)
-                            ? const Color(0xFF15803D)
-                            : const Color(0xFFB45309),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Coordenadas GPS exactas y botón centrar
+          // Coordenadas
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppTheme.borderSubtle),
             ),
             child: Row(
               children: [
-                const Icon(Icons.location_on_rounded, size: 16, color: AppTheme.navy),
-                const SizedBox(width: 6),
+                const Icon(Icons.place_rounded, size: 14, color: AppTheme.electricBlue),
+                const Gap(6),
                 Expanded(
                   child: Text(
                     'Lat: ${node.latitude!.toStringAsFixed(5)}  Lon: ${node.longitude!.toStringAsFixed(5)}',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      fontFamily: 'Roboto',
-                      color: AppTheme.navy,
+                      color: AppTheme.textDark,
                     ),
                   ),
                 ),
                 GestureDetector(
                   onTap: () {
+                    HapticFeedback.lightImpact();
                     Clipboard.setData(ClipboardData(text: '${node.latitude}, ${node.longitude}'));
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Coordenadas copiadas al portapapeles.'),
                         duration: Duration(seconds: 2),
+                        backgroundColor: AppTheme.obsidian,
                       ),
                     );
                   },
                   child: const Padding(
                     padding: EdgeInsets.all(4.0),
-                    child: Icon(Icons.copy_rounded, size: 16, color: Colors.grey),
+                    child: Icon(Icons.copy_rounded, size: 14, color: AppTheme.textMuted),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const Gap(6),
                 InkWell(
                   onTap: () {
+                    HapticFeedback.lightImpact();
                     _mapController.move(LatLng(node.latitude!, node.longitude!), 17.0);
                   },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppTheme.navy,
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppTheme.obsidian,
+                      borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text(
-                      'ENFOCAR',
+                      'Enfocar',
                       style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: FontWeight.w700,
                         color: Colors.white,
                       ),
                     ),
@@ -792,29 +724,29 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
   }) {
     return Column(
       children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(height: 4),
+        Icon(icon, size: 16, color: color),
+        const Gap(4),
         Text(
           value,
           style: const TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w900,
-            color: AppTheme.navy,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textDark,
           ),
         ),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontSize: 9,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey.shade500,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textSubtle,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildFloatingActionButton({
+  Widget _buildFloatingButton({
     required IconData icon,
     required String tooltip,
     required Color color,
@@ -824,31 +756,33 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
   }) {
     return Material(
       color: color,
-      borderRadius: BorderRadius.circular(14),
-      elevation: 4,
-      shadowColor: Colors.black.withAlpha(50),
+      borderRadius: BorderRadius.circular(12),
       child: Tooltip(
         message: tooltip,
         child: InkWell(
           onTap: isLoading ? null : onPressed,
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: 46,
-            height: 46,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppTheme.borderSubtle),
+            ),
             child: isLoading
                 ? Center(
                     child: SizedBox(
-                      width: 20,
-                      height: 20,
+                      width: 16,
+                      height: 16,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
+                        strokeWidth: 2.0,
                         valueColor: AlwaysStoppedAnimation<Color>(iconColor),
                       ),
                     ),
                   )
                 : Icon(
                     icon,
-                    size: 22,
+                    size: 18,
                     color: iconColor,
                   ),
           ),
@@ -857,3 +791,4 @@ class _MapViewWidgetState extends State<MapViewWidget> with SingleTickerProvider
     );
   }
 }
+
