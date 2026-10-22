@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/demo_sheet.dart';
 import '../widgets/mesh_logo.dart';
 
 class SplashScreen extends StatelessWidget {
@@ -91,7 +92,7 @@ class SplashScreen extends StatelessWidget {
 
               const Spacer(),
 
-              // Botón Comenzar
+              // Botón Principal: Comenzar / Vincular
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -103,7 +104,7 @@ class SplashScreen extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.electricBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -112,6 +113,8 @@ class SplashScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: const [
+                      Icon(Icons.bluetooth_searching_rounded, size: 20),
+                      Gap(8),
                       Text(
                         'Comenzar',
                         style: TextStyle(
@@ -127,17 +130,122 @@ class SplashScreen extends StatelessWidget {
                 ),
               ).animate().fadeIn(delay: 550.ms, duration: 350.ms).slideY(begin: 0.1, end: 0),
 
-              const Gap(16),
+              const Gap(10),
+
+              // Botón Destacado: Modo Demostración (Sin Antena)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    HapticFeedback.mediumImpact();
+                    final provider = context.read<MeshProvider>();
+                    provider.enableDemoMode();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: isDark ? const Color(0xFF60A5FA) : AppTheme.electricBlue,
+                    side: BorderSide(
+                      color: isDark ? AppTheme.electricBlue.withAlpha(120) : AppTheme.electricBlue,
+                      width: 1.5,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppTheme.onlineGreen,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'DEMO',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      const Gap(8),
+                      const Text(
+                        'Modo Demostración (Sin Antena)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Gap(6),
+                      const Icon(Icons.bolt_rounded, size: 18, color: AppTheme.onlineGreen),
+                    ],
+                  ),
+                ),
+              ).animate().fadeIn(delay: 600.ms, duration: 350.ms).slideY(begin: 0.1, end: 0),
+
+              const Gap(14),
+
+              // Barra de accesos directos a vistas
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Ir directo a:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: isDark ? AppTheme.textSubtleDark : AppTheme.textSubtle,
+                    ),
+                  ),
+                  const Gap(6),
+                  _buildQuickJumpChip(
+                    context: context,
+                    isDark: isDark,
+                    label: 'Vincular',
+                    onTap: () => context.read<MeshProvider>().goToScreen(AppFlowScreen.pairing),
+                  ),
+                  const Gap(4),
+                  _buildQuickJumpChip(
+                    context: context,
+                    isDark: isDark,
+                    label: 'Nombre',
+                    onTap: () => context.read<MeshProvider>().goToScreen(AppFlowScreen.nameInput),
+                  ),
+                  const Gap(4),
+                  _buildQuickJumpChip(
+                    context: context,
+                    isDark: isDark,
+                    label: 'Chat',
+                    onTap: () {
+                      final p = context.read<MeshProvider>();
+                      if (!p.isDemoMode && !p.isPaired) p.enableDemoMode();
+                      p.goToScreen(AppFlowScreen.mainNav);
+                      p.setTab(0);
+                    },
+                  ),
+                  const Gap(4),
+                  _buildQuickJumpChip(
+                    context: context,
+                    isDark: isDark,
+                    label: 'Más...',
+                    onTap: () => showDemoNavigationModal(context),
+                  ),
+                ],
+              ).animate().fadeIn(delay: 650.ms, duration: 350.ms),
+
+              const Gap(14),
 
               Text(
                 'Proyecto Radio-Mesh Maule · v1.0',
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: isDark ? Colors.white.withAlpha(100) : AppTheme.textSubtle,
                 ),
               ),
-              const Gap(8),
+              const Gap(4),
             ],
           ),
         ),
@@ -171,6 +279,43 @@ class SplashScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildQuickJumpChip({
+    required BuildContext context,
+    required bool isDark,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isDark ? AppTheme.borderDark : const Color(0xFFCBD5E1),
+              width: 0.8,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isDark ? const Color(0xFF93C5FD) : AppTheme.electricBlue,
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -26,6 +26,7 @@ class MeshProvider with ChangeNotifier {
   bool _isPaired = false;
   bool _isMapView = false;
   double _mapZoom = 1.0;
+  bool _isDemoMode = false;
 
   DeviceStatus _deviceStatus = const DeviceStatus();
 
@@ -57,6 +58,7 @@ class MeshProvider with ChangeNotifier {
   String get userName => _userName;
   bool get isPaired => _isPaired;
   bool get isMapView => _isMapView;
+  bool get isDemoMode => _isDemoMode;
   double get mapZoom => _mapZoom;
   DeviceStatus get deviceStatus => _deviceStatus;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
@@ -596,6 +598,59 @@ class MeshProvider with ChangeNotifier {
 
     final userInitials = _userName.length >= 2 ? _userName.substring(0, 2).toUpperCase() : _userName.toUpperCase();
 
+    // 0. Si estamos en Modo Demostración, simular transmisión y respuesta viva
+    if (_isDemoMode) {
+      final newMsg = ChatMessage(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        senderNodeNum: 3105587424,
+        name: 'Yo ($_userName)',
+        initials: userInitials,
+        text: cleanText,
+        timestamp: DateTime.now(),
+        fromMe: true,
+        avatarColor: const Color(0xFF0A1F44),
+        isUrgent: isUrgent || cleanText.toUpperCase().contains('AYUDA') || cleanText.toUpperCase().contains('SOS'),
+        rssiDbm: -72,
+        snr: 10.4,
+        hops: 0,
+      );
+
+      _messages.add(newMsg);
+      _deviceStatus = _deviceStatus.copyWith(
+        totalMessagesTransmitted: _deviceStatus.totalMessagesTransmitted + 1,
+      );
+      RadioLogger().loraTx('DEMO-TX', 'Transmitido por malla LoRa: $cleanText');
+      notifyListeners();
+
+      // Respuesta automática de Base C2 Concepción para dar sensación viva
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (!_isDemoMode) return;
+        final isSos = isUrgent || cleanText.toUpperCase().contains('AYUDA') || cleanText.toUpperCase().contains('SOS');
+        final replyText = isSos
+            ? '🚨 Base C2 Concepción: Recibido SOS de $_userName. Unidad de emergencia Bomberos B-2 desplegada a coordenadas.'
+            : 'Base C2 Concepción copiado: "$cleanText". Enlace LoRa verificado (SNR +9.8dB).';
+
+        final replyMsg = ChatMessage(
+          id: (DateTime.now().millisecondsSinceEpoch + 1).toString(),
+          senderNodeNum: 0x3b1061f9,
+          name: isSos ? 'Central AlertaMesh' : 'Base C2 Concepción',
+          initials: isSos ? 'AM' : 'BC',
+          text: replyText,
+          timestamp: DateTime.now(),
+          fromMe: false,
+          avatarColor: isSos ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
+          isUrgent: isSos,
+          rssiDbm: -74,
+          snr: 9.8,
+          hops: 1,
+        );
+        _messages.add(replyMsg);
+        RadioLogger().loraRx('DEMO-RX', 'Respuesta de ${replyMsg.name}: $replyText');
+        notifyListeners();
+      });
+      return;
+    }
+
     // 1. Transmitir por la malla LoRa real a través de Meshtastic BLE
     await _bleService.sendTextMessage(cleanText);
 
@@ -619,6 +674,267 @@ class MeshProvider with ChangeNotifier {
 
     await _storageService.saveMessages(_messages);
     notifyListeners();
+  }
+
+  // ---------------------------------------------------------------------------
+  // CONTROL DEL MODO DEMOSTRACIÓN (Para presentaciones y pruebas sin antena)
+  // ---------------------------------------------------------------------------
+
+  void enableDemoMode() {
+    _isDemoMode = true;
+    _isPaired = true;
+    if (_userName.isEmpty || _userName == 'Usuario LoRa') {
+      _userName = 'Operador LoRa';
+    }
+
+    _deviceStatus = _deviceStatus.copyWith(
+      isBleConnected: true,
+      isLoRaActive: true,
+      connectedDeviceName: 'WisBlock RAK4630 (Demo)',
+      connectedDeviceId: 'DEMO:RAK4630:CHILE',
+      myNodeNum: 3105587424,
+      nodeId: '!b91f00e0',
+      firmwareVersion: '2.5.4.1b (Meshtastic 915MHz)',
+      hardwareModel: 'RAK4631 WisBlock Core',
+      batteryPercent: 88,
+      voltage: 4.14,
+      channelUtilization: 4.8,
+      airUtilTx: 1.2,
+      activeNodesCount: 5,
+      signalDbm: -74,
+      snr: 9.8,
+      totalMessagesTransmitted: 12,
+    );
+
+    // Posición táctica en el centro de Concepción
+    _currentGpsPosition ??= Position(
+      longitude: -73.04977,
+      latitude: -36.82699,
+      timestamp: DateTime.now(),
+      accuracy: 4.2,
+      altitude: 15.0,
+      heading: 0.0,
+      speed: 0.0,
+      speedAccuracy: 0.0,
+      altitudeAccuracy: 1.0,
+      headingAccuracy: 1.0,
+    );
+    _isGpsActive = true;
+    _gpsStatusMessage = 'GPS Demo Activo (Concepción)';
+
+    _nodesMap.clear();
+    final now = DateTime.now();
+
+    // 1. Base C2 Concepción (Gateway central)
+    _nodesMap[0x3b1061f9] = NeighborNode(
+      nodeNum: 0x3b1061f9,
+      id: '!3b1061f9',
+      name: 'Base C2 Concepción',
+      shortName: 'C2-CONC',
+      distance: '280 m',
+      color: const Color(0xFF2563EB),
+      latitude: -36.82720,
+      longitude: -73.05150,
+      xPercent: 50.0,
+      yPercent: 48.0,
+      isUrgent: false,
+      voltage: 4.18,
+      snr: 10.4,
+      hopsAway: 0,
+      lastSeen: now.subtract(const Duration(seconds: 25)),
+    );
+
+    // 2. Repetidor Cerro Caracol
+    _nodesMap[0xc2084411] = NeighborNode(
+      nodeNum: 0xc2084411,
+      id: '!c2084411',
+      name: 'Repetidor Cerro Caracol',
+      shortName: 'REP-CARA',
+      distance: '1.4 km',
+      color: const Color(0xFF10B981),
+      latitude: -36.83710,
+      longitude: -73.04480,
+      xPercent: 62.0,
+      yPercent: 70.0,
+      isUrgent: false,
+      voltage: 4.05,
+      snr: 8.7,
+      hopsAway: 1,
+      lastSeen: now.subtract(const Duration(minutes: 2)),
+    );
+
+    // 3. Móvil Rescate Bomberos (Urgente)
+    _nodesMap[0xe71239aa] = NeighborNode(
+      nodeNum: 0xe71239aa,
+      id: '!e71239aa',
+      name: 'Móvil Bomberos B-2',
+      shortName: 'BOMB-B2',
+      distance: '920 m',
+      color: const Color(0xFFDC2626),
+      latitude: -36.82150,
+      longitude: -73.05650,
+      xPercent: 35.0,
+      yPercent: 30.0,
+      isUrgent: true,
+      voltage: 3.92,
+      snr: 6.9,
+      hopsAway: 1,
+      lastSeen: now.subtract(const Duration(minutes: 1)),
+    );
+
+    // 4. Puesto Médico Cruz Roja
+    _nodesMap[0xf801235b] = NeighborNode(
+      nodeNum: 0xf801235b,
+      id: '!f801235b',
+      name: 'Puesto Médico Cruz Roja',
+      shortName: 'MED-CRUZ',
+      distance: '1.9 km',
+      color: const Color(0xFFF59E0B),
+      latitude: -36.83120,
+      longitude: -73.06210,
+      xPercent: 20.0,
+      yPercent: 55.0,
+      isUrgent: false,
+      voltage: 3.86,
+      snr: 7.2,
+      hopsAway: 2,
+      lastSeen: now.subtract(const Duration(minutes: 4)),
+    );
+
+    // 5. Gateway Satelital Starlink
+    _nodesMap[0xa98214dd] = NeighborNode(
+      nodeNum: 0xa98214dd,
+      id: '!a98214dd',
+      name: 'Gateway Enlace Starlink',
+      shortName: 'GW-STAR',
+      distance: '2.5 km',
+      color: const Color(0xFF8B5CF6),
+      latitude: -36.81600,
+      longitude: -73.03900,
+      xPercent: 75.0,
+      yPercent: 20.0,
+      isUrgent: false,
+      voltage: 4.19,
+      snr: 11.2,
+      hopsAway: 1,
+      lastSeen: now.subtract(const Duration(seconds: 45)),
+    );
+
+    // Mensajes de chat iniciales para la demo
+    _messages.clear();
+    _messages.addAll([
+      ChatMessage(
+        id: 'demo_1',
+        senderNodeNum: 0x3b1061f9,
+        name: 'Base C2 Concepción',
+        initials: 'BC',
+        text: 'Red LoRa 915 MHz iniciada. Gateway activo con canal primario AlertaMesh.',
+        timestamp: now.subtract(const Duration(minutes: 14)),
+        fromMe: false,
+        avatarColor: const Color(0xFF2563EB),
+        isUrgent: false,
+        rssiDbm: -72,
+        snr: 10.4,
+        hops: 0,
+      ),
+      ChatMessage(
+        id: 'demo_2',
+        senderNodeNum: 0xc2084411,
+        name: 'Repetidor Cerro Caracol',
+        initials: 'RC',
+        text: 'Telemetría Cerro Caracol nominal. Batería 82%, enlace despejado hacia el río.',
+        timestamp: now.subtract(const Duration(minutes: 9)),
+        fromMe: false,
+        avatarColor: const Color(0xFF10B981),
+        isUrgent: false,
+        rssiDbm: -78,
+        snr: 8.7,
+        hops: 1,
+      ),
+      ChatMessage(
+        id: 'demo_3',
+        senderNodeNum: 0xe71239aa,
+        name: 'Móvil Bomberos B-2',
+        initials: 'MB',
+        text: '🚨 PRIORIDAD: Unidad B-2 patrullando sector centro. Frecuencia de emergencia activa.',
+        timestamp: now.subtract(const Duration(minutes: 4)),
+        fromMe: false,
+        avatarColor: const Color(0xFFDC2626),
+        isUrgent: true,
+        rssiDbm: -84,
+        snr: 6.9,
+        hops: 1,
+      ),
+      ChatMessage(
+        id: 'demo_4',
+        senderNodeNum: 0xf801235b,
+        name: 'Puesto Médico Cruz Roja',
+        initials: 'PM',
+        text: 'Puesto médico listo en Parque Ecuador para atención de primeros auxilios.',
+        timestamp: now.subtract(const Duration(minutes: 2)),
+        fromMe: false,
+        avatarColor: const Color(0xFFF59E0B),
+        isUrgent: false,
+        rssiDbm: -81,
+        snr: 7.2,
+        hops: 2,
+      ),
+    ]);
+
+    RadioLogger().info('DEMO', 'Modo Demostración Activado');
+    RadioLogger().ble('DEMO', 'Simulando WisBlock RAK4630 conectado por BLE');
+    RadioLogger().loraRx('DEMO', 'Malla LoRa cargada con 5 nodos tácticos');
+
+    _currentScreen = AppFlowScreen.mainNav;
+    notifyListeners();
+  }
+
+  void disableDemoMode() {
+    _isDemoMode = false;
+    _isPaired = false;
+    _nodesMap.clear();
+    _messages.clear();
+    _deviceStatus = const DeviceStatus();
+    RadioLogger().info('DEMO', 'Modo Demostración Desactivado');
+    notifyListeners();
+  }
+
+  void toggleDemoMode() {
+    if (_isDemoMode) {
+      disableDemoMode();
+    } else {
+      enableDemoMode();
+    }
+  }
+
+  void simulateIncomingMessage({String? sender, String? text, bool isUrgent = false}) {
+    final senderName = sender ?? 'Base C2 Concepción';
+    final msgText = text ?? 'Mensaje de prueba transmitido por la malla LoRa (${DateTime.now().second}s).';
+    final newMsg = ChatMessage(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      senderNodeNum: 0x3b1061f9,
+      name: senderName,
+      initials: senderName.length >= 2 ? senderName.substring(0, 2).toUpperCase() : 'ND',
+      text: msgText,
+      timestamp: DateTime.now(),
+      fromMe: false,
+      avatarColor: isUrgent ? const Color(0xFFDC2626) : const Color(0xFF2563EB),
+      isUrgent: isUrgent,
+      rssiDbm: -73,
+      snr: 9.5,
+      hops: 1,
+    );
+    _messages.add(newMsg);
+    RadioLogger().loraRx('SIM-RX', 'Mensaje entrante de $senderName: $msgText');
+    notifyListeners();
+  }
+
+  void simulateSosAlert() {
+    simulateIncomingMessage(
+      sender: 'Móvil Bomberos B-2',
+      text: '🚨 ¡ALERTA SOS! Solicitamos asistencia inmediata en punto de encuentro Alfa.',
+      isUrgent: true,
+    );
   }
 
   Future<void> sendQuickMessage(String text) async {

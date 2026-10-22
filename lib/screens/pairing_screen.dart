@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../services/ble_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/demo_sheet.dart';
 import '../widgets/mesh_logo.dart';
 
 class PairingScreen extends StatefulWidget {
@@ -170,9 +171,21 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
           ],
         ),
         actions: [
+          // Botón directo para Modo Demo / Menú de Vistas
+          TextButton.icon(
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              showDemoNavigationModal(context);
+            },
+            icon: const Icon(Icons.bolt_rounded, size: 16, color: AppTheme.onlineGreen),
+            label: const Text(
+              'Demo / Vistas',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.onlineGreen),
+            ),
+          ),
           if (isScanning)
             const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: 12),
               child: SizedBox(
                 width: 18,
                 height: 18,
@@ -211,6 +224,104 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
                   child: Column(
                     children: [
+                      // Banner de Modo Demostración / Saltar Antena
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 14),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isDark ? AppTheme.electricBlue.withAlpha(100) : const Color(0xFFBFDBFE),
+                            width: 1.2,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.onlineGreen,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: const Text(
+                                    'DEMO',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
+                                  ),
+                                ),
+                                const Gap(8),
+                                Expanded(
+                                  child: Text(
+                                    '¿Presentando o sin antena a mano?',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: isDark ? AppTheme.textPrimaryDark : AppTheme.textDark,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const Gap(6),
+                            Text(
+                              'Puedes omitir la vinculación Bluetooth y recorrer todas las pantallas con datos tácticos de prueba.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppTheme.textMutedDark : AppTheme.textMuted,
+                                height: 1.3,
+                              ),
+                            ),
+                            const Gap(10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      provider.enableDemoMode();
+                                    },
+                                    icon: const Icon(Icons.bolt_rounded, size: 16),
+                                    label: const Text(
+                                      'Iniciar Modo Demo',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.electricBlue,
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      elevation: 0,
+                                    ),
+                                  ),
+                                ),
+                                const Gap(8),
+                                Expanded(
+                                  child: OutlinedButton.icon(
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      provider.goToScreen(AppFlowScreen.nameInput);
+                                    },
+                                    icon: const Icon(Icons.arrow_forward_rounded, size: 16),
+                                    label: const Text(
+                                      'Omitir Paso',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
                       // Ilustración de Vinculación
                       _buildVisualIllustration(isDark),
                       const Gap(16),
@@ -400,55 +511,85 @@ class _PairingScreenState extends State<PairingScreen> with SingleTickerProvider
               ),
             ),
 
-            // Botón Inferior
+            // Botones Inferiores
             Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isConnecting
-                      ? null
-                      : () {
-                          if (discovered.isNotEmpty) {
-                            _handleConnect(discovered.first);
-                          } else {
-                            _handleConnect();
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isConnecting ? const Color(0xFF94A3B8) : AppTheme.electricBlue,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isConnecting
+                          ? null
+                          : () {
+                              if (discovered.isNotEmpty) {
+                                _handleConnect(discovered.first);
+                              } else {
+                                _handleConnect();
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _isConnecting ? const Color(0xFF94A3B8) : AppTheme.electricBlue,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          if (_isConnecting) ...[
+                            const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            ),
+                            const Gap(10),
+                          ],
+                          Text(
+                            _isConnecting
+                                ? 'Conectando...'
+                                : (discovered.isNotEmpty ? 'Conectar a mi Radio' : 'Buscar Radios'),
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  const Gap(6),
+                  Row(
                     children: [
-                      if (_isConnecting) ...[
-                        const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            provider.goToScreen(AppFlowScreen.splash);
+                          },
+                          icon: const Icon(Icons.arrow_back_rounded, size: 14),
+                          label: const Text('Volver al Inicio', style: TextStyle(fontSize: 12)),
                         ),
-                        const Gap(10),
-                      ],
-                      Text(
-                        _isConnecting
-                            ? 'Conectando...'
-                            : (discovered.isNotEmpty ? 'Conectar a mi Radio' : 'Buscar Radios'),
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
+                      ),
+                      Expanded(
+                        child: TextButton.icon(
+                          onPressed: () {
+                            HapticFeedback.lightImpact();
+                            provider.goToScreen(AppFlowScreen.nameInput);
+                          },
+                          icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                          label: const Text('Omitir y Continuar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
             ),
           ],

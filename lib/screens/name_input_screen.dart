@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/demo_sheet.dart';
 
 class NameInputScreen extends StatefulWidget {
   const NameInputScreen({super.key});
@@ -29,13 +30,12 @@ class _NameInputScreenState extends State<NameInputScreen> {
     super.dispose();
   }
 
-  void _submit() {
-    final name = _nameController.text.trim();
-    if (name.isNotEmpty) {
-      HapticFeedback.lightImpact();
-      final provider = context.read<MeshProvider>();
-      provider.saveUserNameAndContinue(name);
-    }
+  void _submit([String? fallback]) {
+    final rawName = _nameController.text.trim();
+    final name = rawName.isNotEmpty ? rawName : (fallback ?? 'Operador LoRa');
+    HapticFeedback.lightImpact();
+    final provider = context.read<MeshProvider>();
+    provider.saveUserNameAndContinue(name);
   }
 
   @override
@@ -167,11 +167,11 @@ class _NameInputScreenState extends State<NameInputScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _submit,
+                  onPressed: () => _submit(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.electricBlue,
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
@@ -195,7 +195,45 @@ class _NameInputScreenState extends State<NameInputScreen> {
                 ),
               ).animate().fadeIn(delay: 450.ms, duration: 300.ms),
 
-              const Gap(12),
+              const Gap(8),
+
+              // Botones de navegación directa / Omitir
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        context.read<MeshProvider>().goToScreen(AppFlowScreen.pairing);
+                      },
+                      icon: const Icon(Icons.arrow_back_rounded, size: 14),
+                      label: const Text('Volver a Vincular', style: TextStyle(fontSize: 12)),
+                    ),
+                  ),
+                  Expanded(
+                    child: TextButton.icon(
+                      onPressed: () => _submit('Operador LoRa'),
+                      icon: const Icon(Icons.skip_next_rounded, size: 16),
+                      label: const Text('Omitir y Entrar', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    ),
+                  ),
+                ],
+              ),
+
+              const Gap(4),
+
+              Center(
+                child: TextButton.icon(
+                  onPressed: () => showDemoNavigationModal(context),
+                  icon: const Icon(Icons.bolt_rounded, size: 15, color: AppTheme.onlineGreen),
+                  label: const Text(
+                    'Menú Demo & Vistas Directas',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppTheme.onlineGreen),
+                  ),
+                ),
+              ),
+
+              const Gap(8),
             ],
           ),
         ),

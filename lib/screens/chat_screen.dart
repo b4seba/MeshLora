@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/chat_message.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/demo_sheet.dart';
 import '../widgets/mesh_logo.dart';
 import '../widgets/quick_message_bar.dart';
 import 'logs_screen.dart';
@@ -214,6 +215,20 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     const Gap(8),
                   ],
+
+                  _buildOptionTile(
+                    isDark: isDark,
+                    icon: Icons.smart_toy_rounded,
+                    iconBg: isDark ? AppTheme.electricBlue.withAlpha(40) : const Color(0xFFEFF6FF),
+                    iconColor: AppTheme.electricBlue,
+                    title: 'Modo Demo & Pasar a Otras Vistas',
+                    subtitle: 'Navegar sin antena física o simular alertas LoRa',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      showDemoNavigationModal(context);
+                    },
+                  ),
+                  const Gap(8),
 
                   _buildOptionTile(
                     isDark: isDark,
@@ -622,6 +637,16 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          _buildHeaderAction(
+            isDark: isDark,
+            tooltip: 'Modo Demo & Vistas',
+            icon: Icons.bolt_rounded,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              showDemoNavigationModal(context);
+            },
+          ),
+          const Gap(6),
           _buildHeaderAction(
             isDark: isDark,
             tooltip: 'Sincronizar Malla',

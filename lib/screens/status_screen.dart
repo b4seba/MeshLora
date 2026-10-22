@@ -5,6 +5,7 @@ import 'package:gap/gap.dart';
 import 'package:provider/provider.dart';
 import '../providers/mesh_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/demo_sheet.dart';
 import '../widgets/emergency_guide_sheet.dart';
 import '../widgets/mesh_logo.dart';
 import 'logs_screen.dart';
@@ -90,6 +91,37 @@ class StatusScreen extends StatelessWidget {
           ],
         ),
         actions: [
+          Tooltip(
+            message: 'Modo Demo & Vistas',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  showDemoNavigationModal(context);
+                },
+                borderRadius: BorderRadius.circular(11),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.obsidianElevated : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: isDark ? AppTheme.borderDark : const Color(0xFFE2E8F0),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.bolt_rounded,
+                    size: 20,
+                    color: AppTheme.onlineGreen,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const Gap(6),
           Tooltip(
             message: 'Sincronizar Telemetría',
             child: Material(
