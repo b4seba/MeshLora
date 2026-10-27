@@ -670,6 +670,41 @@ class BleService {
     }
   }
 
+  /// Transmite la telemetría de batería y voltaje por la malla LoRa
+  Future<bool> sendTelemetry({
+    required int batteryLevel,
+    required double voltage,
+    int toNodeNum = kBroadcastNodeNum,
+  }) async {
+    if (_currentState != BleConnectionState.connected || _toRadioCharacteristic == null) {
+      return false;
+    }
+
+    try {
+      final telemPacket = MeshtasticProtocol.buildTelemetryPacket(
+        batteryLevel: batteryLevel,
+        voltage: voltage,
+        myNodeNum: _myNodeNum,
+        toNodeNum: toNodeNum,
+      );
+
+      final canWriteNoResp = _toRadioCharacteristic!.properties.writeWithoutResponse;
+      final canWriteWithResp = _toRadioCharacteristic!.properties.write;
+
+      await _toRadioCharacteristic!.write(
+        telemPacket,
+        withoutResponse: canWriteNoResp || !canWriteWithResp,
+        timeout: 4,
+      );
+
+      _logger.telemetry('TELEMETRÍA TX', '⚡ Telemetría LoRa emitida: Bat=$batteryLevel% | Volt=${voltage.toStringAsFixed(2)}V');
+      return true;
+    } catch (e) {
+      _logger.error('TELEMETRÍA TX', 'Error transmitiendo telemetría LoRa: $e');
+      return false;
+    }
+  }
+
   /// Configura el nombre del nodo en la memoria flash/NVS del WisBlock y lo difunde a la malla LoRa
   Future<bool> setNodeOwner({
     required String longName,

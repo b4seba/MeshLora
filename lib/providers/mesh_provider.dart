@@ -1092,12 +1092,20 @@ class MeshProvider with ChangeNotifier {
         '   • Alt: ${_currentGpsPosition!.altitude.round()}m',
       );
 
-      // Enviar por BLE a la antena física WisBlock
+      // Enviar por BLE a la antena física WisBlock (Posición GPS)
       final ok = await _bleService.sendPosition(
         latitude: _currentGpsPosition!.latitude,
         longitude: _currentGpsPosition!.longitude,
         altitude: _currentGpsPosition!.altitude.toInt(),
       );
+
+      // Emitir también telemetría de batería y voltaje reales a la malla
+      if (_deviceStatus.batteryPercent > 0 || _deviceStatus.voltage > 0) {
+        await _bleService.sendTelemetry(
+          batteryLevel: _deviceStatus.batteryPercent,
+          voltage: _deviceStatus.voltage,
+        );
+      }
 
       _gpsStatusMessage = ok ? 'Ubicación emitida por LoRa' : 'Error al emitir';
       return ok;

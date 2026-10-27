@@ -858,6 +858,57 @@ class MeshtasticProtocol {
     return toRadioWriter.toBytes();
   }
 
+  /// Construye un paquete `ToRadio` con telemetría de batería y voltaje (TELEMETRY_APP = 67)
+  static Uint8List buildTelemetryPacket({
+    required int batteryLevel,
+    required double voltage,
+    int myNodeNum = 0,
+    int toNodeNum = kBroadcastNodeNum,
+    int channel = 0,
+    int hopLimit = 3,
+  }) {
+    final rand = Random();
+    final packetId = rand.nextInt(0x7FFFFFFF);
+
+    // 1. DeviceMetrics submessage
+    final dmWriter = _ProtobufWriter();
+    dmWriter.writeVarintField(1, batteryLevel.clamp(0, 100)); // battery_level
+    dmWriter.writeFloatField(2, voltage);                    // voltage (float32)
+    final dmBytes = dmWriter.toBytes();
+
+    // 2. Telemetry submessage
+    final telemWriter = _ProtobufWriter();
+    telemWriter.writeFixed32Field(1, DateTime.now().millisecondsSinceEpoch ~/ 1000);
+    telemWriter.writeBytesField(2, dmBytes); // device_metrics
+    final telemBytes = telemWriter.toBytes();
+
+    // 3. Data submessage (TELEMETRY_APP = 67)
+    final dataWriter = _ProtobufWriter();
+    dataWriter.writeVarintField(1, kPortNumTelemetry);
+    dataWriter.writeBytesField(2, telemBytes);
+    dataWriter.writeVarintField(3, 0);
+    final dataBytes = dataWriter.toBytes();
+
+    // 4. MeshPacket submessage
+    final packetWriter = _ProtobufWriter();
+    if (myNodeNum > 0) {
+      packetWriter.writeFixed32Field(1, myNodeNum);
+    }
+    packetWriter.writeFixed32Field(2, toNodeNum);
+    packetWriter.writeVarintField(3, channel);
+    packetWriter.writeBytesField(4, dataBytes);
+    packetWriter.writeFixed32Field(6, packetId);
+    packetWriter.writeVarintField(9, hopLimit);
+    packetWriter.writeVarintField(10, 0);
+    final meshPacketBytes = packetWriter.toBytes();
+
+    // 5. ToRadio message (field 1: packet)
+    final toRadioWriter = _ProtobufWriter();
+    toRadioWriter.writeBytesField(1, meshPacketBytes);
+
+    return toRadioWriter.toBytes();
+  }
+
   /// Construye un paquete `ToRadio` con un comando de administración `AdminMessage.set_owner`
   /// para configurar el nombre largo y corto del nodo en la memoria flash/NVS de la radio WisBlock.
   static Uint8List buildSetOwnerPacket({
@@ -1212,6 +1263,12 @@ class _ProtobufWriter {
   void writeSFixed32Field(int fieldNumber, int value) {
     writeTag(fieldNumber, _WireType.fixed32);
     final bd = ByteData(4)..setInt32(0, value, Endian.little);
+    _bytes.addAll(bd.buffer.asUint8List());
+  }
+
+  void writeFloatField(int fieldNumber, double value) {
+    writeTag(fieldNumber, _WireType.fixed32);
+    final bd = ByteData(4)..setFloat32(0, value, Endian.little);
     _bytes.addAll(bd.buffer.asUint8List());
   }
 
