@@ -146,6 +146,11 @@ class MeshProvider with ChangeNotifier {
     // 1. Estado de conexión BLE
     _bleStateSub = _bleService.connectionStateStream.listen((state) {
       if (state == BleConnectionState.connected) {
+        if (_isDemoMode) {
+          _isDemoMode = false;
+          _nodesMap.clear();
+          _messages.clear();
+        }
         _isPaired = true;
         _deviceStatus = _deviceStatus.copyWith(
           isBleConnected: true,
@@ -407,8 +412,8 @@ class MeshProvider with ChangeNotifier {
         );
       }
 
-      // Si es la info de mi propio nodo, actualizar mi nombre si no se ha fijado
-      if (isMe && node.longName.isNotEmpty && _userName == 'Usuario LoRa') {
+      // Si es la info de mi propio nodo, sincronizar siempre con el nombre real de la radio conectada
+      if (isMe && node.longName.isNotEmpty) {
         _userName = node.longName;
       }
 
@@ -725,111 +730,73 @@ class MeshProvider with ChangeNotifier {
     _nodesMap.clear();
     final now = DateTime.now();
 
-    // 1. Base C2 Concepción (Gateway central)
-    _nodesMap[0x3b1061f9] = NeighborNode(
-      nodeNum: 0x3b1061f9,
-      id: '!3b1061f9',
-      name: 'Base C2 Concepción',
-      shortName: 'C2-CONC',
-      distance: '280 m',
+    // 1. Nodo Madre (Base C2 Gateway)
+    _nodesMap[0x520aee97] = NeighborNode(
+      nodeNum: 0x520aee97,
+      id: '!520aee97',
+      name: 'Nodo Madre (Base)',
+      shortName: 'BASE',
+      distance: '0 m',
       color: const Color(0xFF2563EB),
-      latitude: -36.82720,
-      longitude: -73.05150,
+      latitude: -35.42477,
+      longitude: -71.62638,
       xPercent: 50.0,
       yPercent: 48.0,
       isUrgent: false,
-      voltage: 4.18,
+      voltage: 4.26,
       snr: 10.4,
+      hopsAway: 0,
+      lastSeen: now.subtract(const Duration(seconds: 15)),
+    );
+
+    // 2. Nodo A (Móvil Rescate 1)
+    _nodesMap[0x49a8096e] = NeighborNode(
+      nodeNum: 0x49a8096e,
+      id: '!49a8096e',
+      name: 'Nodo A',
+      shortName: 'NA',
+      distance: '320 m',
+      color: const Color(0xFF10B981),
+      latitude: -35.41565,
+      longitude: -71.64395,
+      xPercent: 35.0,
+      yPercent: 40.0,
+      isUrgent: false,
+      voltage: 4.05,
+      snr: 6.0,
+      hopsAway: 0,
+      lastSeen: now.subtract(const Duration(seconds: 40)),
+    );
+
+    // 3. Nodo B (Móvil Rescate 2)
+    _nodesMap[0x88b0cd4d] = NeighborNode(
+      nodeNum: 0x88b0cd4d,
+      id: '!88b0cd4d',
+      name: 'Nodo B',
+      shortName: 'NB',
+      distance: '450 m',
+      color: const Color(0xFFF59E0B),
+      latitude: -35.41565,
+      longitude: -71.64395,
+      xPercent: 65.0,
+      yPercent: 55.0,
+      isUrgent: false,
+      voltage: 4.15,
+      snr: 7.2,
       hopsAway: 0,
       lastSeen: now.subtract(const Duration(seconds: 25)),
     );
 
-    // 2. Repetidor Cerro Caracol
-    _nodesMap[0xc2084411] = NeighborNode(
-      nodeNum: 0xc2084411,
-      id: '!c2084411',
-      name: 'Repetidor Cerro Caracol',
-      shortName: 'REP-CARA',
-      distance: '1.4 km',
-      color: const Color(0xFF10B981),
-      latitude: -36.83710,
-      longitude: -73.04480,
-      xPercent: 62.0,
-      yPercent: 70.0,
-      isUrgent: false,
-      voltage: 4.05,
-      snr: 8.7,
-      hopsAway: 1,
-      lastSeen: now.subtract(const Duration(minutes: 2)),
-    );
-
-    // 3. Móvil Rescate Bomberos (Urgente)
-    _nodesMap[0xe71239aa] = NeighborNode(
-      nodeNum: 0xe71239aa,
-      id: '!e71239aa',
-      name: 'Móvil Bomberos B-2',
-      shortName: 'BOMB-B2',
-      distance: '920 m',
-      color: const Color(0xFFDC2626),
-      latitude: -36.82150,
-      longitude: -73.05650,
-      xPercent: 35.0,
-      yPercent: 30.0,
-      isUrgent: true,
-      voltage: 3.92,
-      snr: 6.9,
-      hopsAway: 1,
-      lastSeen: now.subtract(const Duration(minutes: 1)),
-    );
-
-    // 4. Puesto Médico Cruz Roja
-    _nodesMap[0xf801235b] = NeighborNode(
-      nodeNum: 0xf801235b,
-      id: '!f801235b',
-      name: 'Puesto Médico Cruz Roja',
-      shortName: 'MED-CRUZ',
-      distance: '1.9 km',
-      color: const Color(0xFFF59E0B),
-      latitude: -36.83120,
-      longitude: -73.06210,
-      xPercent: 20.0,
-      yPercent: 55.0,
-      isUrgent: false,
-      voltage: 3.86,
-      snr: 7.2,
-      hopsAway: 2,
-      lastSeen: now.subtract(const Duration(minutes: 4)),
-    );
-
-    // 5. Gateway Satelital Starlink
-    _nodesMap[0xa98214dd] = NeighborNode(
-      nodeNum: 0xa98214dd,
-      id: '!a98214dd',
-      name: 'Gateway Enlace Starlink',
-      shortName: 'GW-STAR',
-      distance: '2.5 km',
-      color: const Color(0xFF8B5CF6),
-      latitude: -36.81600,
-      longitude: -73.03900,
-      xPercent: 75.0,
-      yPercent: 20.0,
-      isUrgent: false,
-      voltage: 4.19,
-      snr: 11.2,
-      hopsAway: 1,
-      lastSeen: now.subtract(const Duration(seconds: 45)),
-    );
-
-    // Mensajes de chat iniciales para la demo
+    // Mensajes de chat iniciales para la demo entre los 3 nodos reales
     _messages.clear();
     _messages.addAll([
       ChatMessage(
         id: 'demo_1',
-        senderNodeNum: 0x3b1061f9,
-        name: 'Base C2 Concepción',
-        initials: 'BC',
+        senderNodeNum: 0x520aee97,
+        name: 'Nodo Madre (Base)',
+        initials: 'BA',
         text: 'Red LoRa 915 MHz iniciada. Gateway activo con canal primario AlertaMesh.',
-        timestamp: now.subtract(const Duration(minutes: 14)),
+        timestamp: now.subtract(const Duration(minutes: 10)),
         fromMe: false,
         avatarColor: const Color(0xFF2563EB),
         isUrgent: false,
@@ -839,51 +806,37 @@ class MeshProvider with ChangeNotifier {
       ),
       ChatMessage(
         id: 'demo_2',
-        senderNodeNum: 0xc2084411,
-        name: 'Repetidor Cerro Caracol',
-        initials: 'RC',
-        text: 'Telemetría Cerro Caracol nominal. Batería 82%, enlace despejado hacia el río.',
-        timestamp: now.subtract(const Duration(minutes: 9)),
+        senderNodeNum: 0x49a8096e,
+        name: 'Nodo A',
+        initials: 'NA',
+        text: 'Nodo A en línea y patrullando. Telemetría y enlace 5/5.',
+        timestamp: now.subtract(const Duration(minutes: 5)),
         fromMe: false,
         avatarColor: const Color(0xFF10B981),
         isUrgent: false,
         rssiDbm: -78,
-        snr: 8.7,
-        hops: 1,
+        snr: 6.0,
+        hops: 0,
       ),
       ChatMessage(
         id: 'demo_3',
-        senderNodeNum: 0xe71239aa,
-        name: 'Móvil Bomberos B-2',
-        initials: 'MB',
-        text: '🚨 PRIORIDAD: Unidad B-2 patrullando sector centro. Frecuencia de emergencia activa.',
-        timestamp: now.subtract(const Duration(minutes: 4)),
-        fromMe: false,
-        avatarColor: const Color(0xFFDC2626),
-        isUrgent: true,
-        rssiDbm: -84,
-        snr: 6.9,
-        hops: 1,
-      ),
-      ChatMessage(
-        id: 'demo_4',
-        senderNodeNum: 0xf801235b,
-        name: 'Puesto Médico Cruz Roja',
-        initials: 'PM',
-        text: 'Puesto médico listo en Parque Ecuador para atención de primeros auxilios.',
+        senderNodeNum: 0x88b0cd4d,
+        name: 'Nodo B',
+        initials: 'NB',
+        text: 'Nodo B en posición. Batería 90%, enlace LoRa operativo.',
         timestamp: now.subtract(const Duration(minutes: 2)),
         fromMe: false,
         avatarColor: const Color(0xFFF59E0B),
         isUrgent: false,
-        rssiDbm: -81,
+        rssiDbm: -80,
         snr: 7.2,
-        hops: 2,
+        hops: 0,
       ),
     ]);
 
     RadioLogger().info('DEMO', 'Modo Demostración Activado');
     RadioLogger().ble('DEMO', 'Simulando WisBlock RAK4630 conectado por BLE');
-    RadioLogger().loraRx('DEMO', 'Malla LoRa cargada con 5 nodos tácticos');
+    RadioLogger().loraRx('DEMO', 'Malla LoRa cargada con 3 nodos tácticos (Base, Nodo A, Nodo B)');
 
     _currentScreen = AppFlowScreen.mainNav;
     notifyListeners();
