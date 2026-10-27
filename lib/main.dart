@@ -39,8 +39,15 @@ class RadioMeshApp extends StatelessWidget {
             title: 'Alerta Mesh Maule',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: provider.themeMode,
+            themeMode: ThemeMode.light, // Bloqueo absoluto a Modo Claro para visibilidad universal en emergencias
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(provider.textScaleFactor),
+                ),
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             home: _buildCurrentScreen(provider.currentScreen),
           );
         },

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../theme/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 class CustomBottomNavBar extends StatelessWidget {
   final int activeIndex;
@@ -14,55 +14,54 @@ class CustomBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const Color activeColor = Color(0xFF1F74BF);
+    const Color inactiveColor = Color(0xFF9E9E9E);
+    const Color bgColor = Color(0xFFFFFFFF);
+    const Color borderColor = Color(0xFFEEEEEE);
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.obsidianCard : Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: isDark ? AppTheme.obsidianBorder : AppTheme.borderSubtle,
-            width: 1.2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(isDark ? 30 : 10),
-              blurRadius: 20,
-              spreadRadius: 0,
-              offset: const Offset(0, 4),
-            ),
-          ],
+    return Container(
+      decoration: const BoxDecoration(
+        color: bgColor, // Fondo blanco puro
+        border: Border(
+          top: BorderSide(color: borderColor, width: 1),
         ),
-        child: Row(
-          children: [
-            _buildNavItem(
-              context: context,
-              index: 0,
-              label: 'Mensajes',
-              icon: Icons.chat_bubble_outline_rounded,
-              activeIcon: Icons.chat_bubble_rounded,
-            ),
-            const SizedBox(width: 6),
-            _buildNavItem(
-              context: context,
-              index: 1,
-              label: 'Vecinos',
-              icon: Icons.people_outline_rounded,
-              activeIcon: Icons.people_rounded,
-            ),
-            const SizedBox(width: 6),
-            _buildNavItem(
-              context: context,
-              index: 2,
-              label: 'Estado',
-              icon: Icons.sensors_rounded,
-              activeIcon: Icons.sensors_rounded,
-            ),
-          ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 58),
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Row(
+            children: [
+              _buildNavItem(
+                context: context,
+                index: 0,
+                label: 'Mensajes',
+                icon: Icons.chat_bubble_outline_rounded,
+                activeIcon: Icons.chat_bubble_rounded,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+              ),
+              _buildNavItem(
+                context: context,
+                index: 1,
+                label: 'Vecinos',
+                icon: Icons.people_outline_rounded,
+                activeIcon: Icons.people_rounded,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+              ),
+              _buildNavItem(
+                context: context,
+                index: 2,
+                label: 'Estado',
+                icon: Icons.sensors_rounded,
+                activeIcon: Icons.sensors_rounded,
+                activeColor: activeColor,
+                inactiveColor: inactiveColor,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -74,9 +73,11 @@ class CustomBottomNavBar extends StatelessWidget {
     required String label,
     required IconData icon,
     required IconData activeIcon,
+    required Color activeColor,
+    required Color inactiveColor,
   }) {
     final isActive = activeIndex == index;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isActive ? activeColor : inactiveColor;
 
     return Expanded(
       child: GestureDetector(
@@ -85,18 +86,9 @@ class CustomBottomNavBar extends StatelessWidget {
           onTabSelected(index);
         },
         behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isActive
-                ? (isDark
-                    ? AppTheme.electricBlue.withAlpha(45)
-                    : AppTheme.electricBlueLight)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-          ),
+        child: Container(
+          // Icono y texto completamente libres, SIN contenedor ni rectángulo de fondo
+          color: Colors.transparent,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -104,20 +96,21 @@ class CustomBottomNavBar extends StatelessWidget {
               Icon(
                 isActive ? activeIcon : icon,
                 size: 22,
-                color: isActive
-                    ? AppTheme.electricBlue
-                    : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
+                color: color,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive
-                      ? AppTheme.electricBlue
-                      : (isDark ? AppTheme.textSubtle : AppTheme.textMuted),
-                  letterSpacing: -0.2,
+              const SizedBox(height: 3),
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    label,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                      color: color,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                 ),
               ),
             ],

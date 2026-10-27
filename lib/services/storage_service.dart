@@ -57,6 +57,7 @@ class StorageService {
   }
 
   static const String _kThemeMode = 'radio_mesh_theme_mode';
+  static const String _kTextScaleFactor = 'radio_mesh_text_scale_factor';
 
   Future<void> saveThemeMode(String mode) async {
     final prefs = await SharedPreferences.getInstance();
@@ -66,6 +67,16 @@ class StorageService {
   Future<String?> getThemeMode() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_kThemeMode);
+  }
+
+  Future<void> saveTextScaleFactor(double scale) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_kTextScaleFactor, scale);
+  }
+
+  Future<double?> getTextScaleFactor() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_kTextScaleFactor);
   }
 
   Future<void> clearAll() async {

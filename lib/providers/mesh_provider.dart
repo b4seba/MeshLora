@@ -102,8 +102,11 @@ class MeshProvider with ChangeNotifier {
     });
   }
 
-  ThemeMode _themeMode = ThemeMode.system;
+  ThemeMode _themeMode = ThemeMode.light;
   ThemeMode get themeMode => _themeMode;
+
+  double _textScaleFactor = 1.0;
+  double get textScaleFactor => _textScaleFactor;
 
   Future<void> _loadStoredPreferences() async {
     final savedName = await _storageService.getUserName();
@@ -114,32 +117,48 @@ class MeshProvider with ChangeNotifier {
     if (savedMessages != null && savedMessages.isNotEmpty) {
       _messages.addAll(savedMessages);
     }
-    final savedTheme = await _storageService.getThemeMode();
-    if (savedTheme == 'light') {
-      _themeMode = ThemeMode.light;
-    } else if (savedTheme == 'dark') {
-      _themeMode = ThemeMode.dark;
-    } else {
-      _themeMode = ThemeMode.system;
+    // Bloqueo estricto a modo claro para crisis y alta visibilidad
+    _themeMode = ThemeMode.light;
+
+    // Cargar escala de texto accesible (0.9 a 2.0)
+    final savedScale = await _storageService.getTextScaleFactor();
+    if (savedScale != null && savedScale >= 0.85 && savedScale <= 2.05) {
+      _textScaleFactor = savedScale;
     }
     notifyListeners();
   }
 
+  Future<void> setTextScaleFactor(double factor) async {
+    final clamped = factor.clamp(0.9, 2.0);
+    // Redondear a 2 decimales para consistencia numérica
+    _textScaleFactor = double.parse(clamped.toStringAsFixed(2));
+    await _storageService.saveTextScaleFactor(_textScaleFactor);
+    notifyListeners();
+  }
+
+  Future<void> increaseTextScale() async {
+    await setTextScaleFactor(_textScaleFactor + 0.15);
+  }
+
+  Future<void> decreaseTextScale() async {
+    await setTextScaleFactor(_textScaleFactor - 0.15);
+  }
+
+  Future<void> resetTextScale() async {
+    await setTextScaleFactor(1.0);
+  }
+
   Future<void> setThemeMode(ThemeMode mode) async {
-    _themeMode = mode;
-    final modeStr = mode == ThemeMode.light
-        ? 'light'
-        : (mode == ThemeMode.dark ? 'dark' : 'system');
-    await _storageService.saveThemeMode(modeStr);
+    // Forzado a light en cumplimiento con el requerimiento de crisis
+    _themeMode = ThemeMode.light;
+    await _storageService.saveThemeMode('light');
     notifyListeners();
   }
 
   Future<void> toggleThemeMode() async {
-    if (_themeMode == ThemeMode.dark) {
-      await setThemeMode(ThemeMode.light);
-    } else {
-      await setThemeMode(ThemeMode.dark);
-    }
+    _themeMode = ThemeMode.light;
+    await _storageService.saveThemeMode('light');
+    notifyListeners();
   }
 
   void _initBleStreams() {

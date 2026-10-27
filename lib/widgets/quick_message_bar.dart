@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:gap/gap.dart';
-import '../theme/app_theme.dart';
+import 'package:google_fonts/google_fonts.dart';
 
+/// Barra de acciones rápidas resiliente al escalado de texto (Accesibilidad).
+/// Cumple con:
+/// - Eliminación de altura fija (cero SizedBox(height: 48)).
+/// - Ajuste dinámico de altura y expansión en múltiples líneas (Flexible + softWrap).
+/// - Fondo blanco puro (#FFFFFF) y textos/iconos en #1F74BF.
 class QuickMessageBar extends StatelessWidget {
   final Function(String) onQuickMessageTapped;
 
@@ -14,114 +19,113 @@ class QuickMessageBar extends StatelessWidget {
   static const List<Map<String, dynamic>> _quickItems = [
     {
       'text': '¡Estoy bien!',
-      'color': AppTheme.onlineGreen,
-      'bg': AppTheme.onlineGreenLight,
       'icon': Icons.check_circle_outline_rounded,
-      'isUrgent': false,
     },
     {
       'text': 'Necesito ayuda',
-      'color': AppTheme.redAlert,
-      'bg': AppTheme.redAlertLight,
-      'icon': Icons.warning_amber_rounded,
-      'isUrgent': true,
+      'icon': Icons.emergency_outlined,
     },
     {
       'text': '¿Dónde están?',
-      'color': AppTheme.obsidian,
-      'bg': Color(0xFFF1F5F9),
       'icon': Icons.help_outline_rounded,
-      'isUrgent': false,
     },
     {
       'text': 'Punto de encuentro',
-      'color': Color(0xFFD97706),
-      'bg': Color(0xFFFFFBEB),
-      'icon': Icons.place_rounded,
-      'isUrgent': false,
+      'icon': Icons.place_outlined,
     },
     {
       'text': 'Hay agua disponible',
-      'color': AppTheme.electricBlue,
-      'bg': AppTheme.electricBlueLight,
       'icon': Icons.water_drop_outlined,
-      'isUrgent': false,
     },
   ];
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const Color brandPrimary = Color(0xFF1F74BF);
+    // Modo Claro garantizado (#FFFFFF en contenedores sobre fondo #F2F2F2)
+    const Color buttonBg = Color(0xFFFFFFFF);
 
-    return SizedBox(
-      height: 38,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _quickItems.length,
-        separatorBuilder: (context, index) => const Gap(8),
-        itemBuilder: (context, index) {
-          final item = _quickItems[index];
-          final text = item['text'] as String;
-          Color color = item['color'] as Color;
-          Color bg = item['bg'] as Color;
-          final icon = item['icon'] as IconData;
+    // Sin altura fija rígida: el contenedor se adapta dinámicamente al texto escalado
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          for (int i = 0; i < _quickItems.length; i++) ...[
+            if (i > 0) const Gap(8),
+            _buildQuickChip(
+              text: _quickItems[i]['text'] as String,
+              icon: _quickItems[i]['icon'] as IconData,
+              brandPrimary: brandPrimary,
+              buttonBg: buttonBg,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 
-          if (isDark) {
-            if (color == AppTheme.obsidian) {
-              color = AppTheme.textPrimaryDark;
-              bg = AppTheme.obsidianCard;
-            } else if (color == AppTheme.onlineGreen) {
-              bg = AppTheme.onlineGreen.withAlpha(35);
-            } else if (color == AppTheme.redAlert) {
-              bg = AppTheme.redAlert.withAlpha(35);
-            } else if (color == AppTheme.electricBlue) {
-              bg = AppTheme.electricBlue.withAlpha(35);
-            } else {
-              bg = const Color(0xFFD97706).withAlpha(35);
-            }
-          }
-
-          return Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () {
-                HapticFeedback.lightImpact();
-                onQuickMessageTapped(text);
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: bg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? color.withAlpha(90) : color.withAlpha(50),
-                    width: 1,
+  Widget _buildQuickChip({
+    required String text,
+    required IconData icon,
+    required Color brandPrimary,
+    required Color buttonBg,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onQuickMessageTapped(text);
+        },
+        borderRadius: BorderRadius.circular(24),
+        child: Container(
+          // Altura mínima accesible de 48dp, pero expandible dinámicamente sin límite superior rígido
+          constraints: const BoxConstraints(
+            minHeight: 48,
+            maxWidth: 220, // Permite que textos largos como 'Punto de encuentro' o 'Hay agua disponible' salten de línea
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: buttonBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: const Color(0x331F74BF), // #1F74BF al 20%
+              width: 1,
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000), // Opacidad sutil 0.04
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(icon, size: 17, color: brandPrimary),
+              const Gap(8),
+              // Flexible con softWrap: true permite que los botones se expandan en múltiples líneas sin overflow
+              Flexible(
+                child: Text(
+                  text,
+                  softWrap: true,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: brandPrimary,
+                    letterSpacing: -0.1,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(icon, size: 14, color: color),
-                    const Gap(6),
-                    Text(
-                      text,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: color,
-                        letterSpacing: -0.1,
-                      ),
-                    ),
-                  ],
-                ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
 }
-
