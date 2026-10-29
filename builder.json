@@ -1,0 +1,22 @@
+{
+  "project": "MeshLora",
+  "platform": "ios",
+  "github": {
+    "owner": "b4seba",
+    "repo": "MeshLora"
+  },
+  "provider": "github",
+  "codemagic": {},
+  "bitrise": {},
+  "ios": {
+    "path": "ios",
+    "bundleId": "cl.uautonoma.radiomesh.radioMesh"
+  },
+  "flutter": {
+    "version": "3.47.6",
+    "watch": {}
+  },
+  "reactNative": {},
+  "kmp": {},
+  "mobai": {}
+}
