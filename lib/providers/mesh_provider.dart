@@ -787,7 +787,26 @@ class MeshProvider with ChangeNotifier {
       lastSeen: now.subtract(const Duration(seconds: 25)),
     );
 
-    // Mensajes de chat iniciales para la demo entre los 3 nodos reales
+    // 4. Nodo C (Móvil Rescate 3 - WisBlock RAK4631 Físico)
+    _nodesMap[0x7f75eee9] = NeighborNode(
+      nodeNum: 0x7f75eee9,
+      id: '!7f75eee9',
+      name: 'Nodo C',
+      shortName: 'NC',
+      distance: '580 m',
+      color: const Color(0xFF8B5CF6),
+      latitude: -35.41820,
+      longitude: -71.63850,
+      xPercent: 45.0,
+      yPercent: 65.0,
+      isUrgent: false,
+      voltage: 4.23,
+      snr: 8.5,
+      hopsAway: 0,
+      lastSeen: now.subtract(const Duration(seconds: 10)),
+    );
+
+    // Mensajes de chat iniciales para la demo entre los nodos reales
     _messages.clear();
     _messages.addAll([
       ChatMessage(
@@ -832,11 +851,25 @@ class MeshProvider with ChangeNotifier {
         snr: 7.2,
         hops: 0,
       ),
+      ChatMessage(
+        id: 'demo_4',
+        senderNodeNum: 0x7f75eee9,
+        name: 'Nodo C',
+        initials: 'NC',
+        text: 'Nodo C enlazado y listo. RAK4631 operativo.',
+        timestamp: now.subtract(const Duration(minutes: 1)),
+        fromMe: false,
+        avatarColor: const Color(0xFF8B5CF6),
+        isUrgent: false,
+        rssiDbm: -75,
+        snr: 8.5,
+        hops: 0,
+      ),
     ]);
 
     RadioLogger().info('DEMO', 'Modo Demostración Activado');
     RadioLogger().ble('DEMO', 'Simulando WisBlock RAK4630 conectado por BLE');
-    RadioLogger().loraRx('DEMO', 'Malla LoRa cargada con 3 nodos tácticos (Base, Nodo A, Nodo B)');
+    RadioLogger().loraRx('DEMO', 'Malla LoRa cargada con 4 nodos tácticos (Base, Nodo A, Nodo B, Nodo C)');
 
     _currentScreen = AppFlowScreen.mainNav;
     notifyListeners();

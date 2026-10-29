@@ -66,5 +66,15 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Permisos para Bluetooth (flutter_blue_plus) -->
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Esta aplicación requiere acceso a Bluetooth para conectarse a los nodos LoRa Mesh.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Esta aplicación requiere acceso a Bluetooth para comunicarse con dispositivos LoRa.</string>
+	<!-- Permisos para Ubicación (geolocator) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Se requiere tu ubicación para situarte en el mapa de la red Mesh y compartir telemetría de emergencia.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Se requiere tu ubicación para reportar tu posición en la red Mesh.</string>
 </dict>
 </plist>
