@@ -910,6 +910,23 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
+  String _deliveryLabel(ChatMessage message) {
+    switch (message.deliveryState) {
+      case MessageDeliveryState.created:
+        return 'Creado';
+      case MessageDeliveryState.queued:
+        return 'En cola';
+      case MessageDeliveryState.transmitting:
+        return 'Transmitiendo';
+      case MessageDeliveryState.acknowledged:
+        return 'Confirmado por ACK';
+      case MessageDeliveryState.failed:
+        return 'Fallido';
+      case MessageDeliveryState.unconfirmed:
+        return 'Sin confirmación';
+    }
+  }
+
   Widget _buildMessageItem(ChatMessage msg, bool isDark) {
     if (msg.fromMe) {
       return Padding(
@@ -945,7 +962,7 @@ class _ChatScreenState extends State<ChatScreen> {
             Padding(
               padding: const EdgeInsets.only(right: 4),
               child: Text(
-                '${msg.formattedTime} · Emitido por LoRa',
+                '${msg.formattedTime} · ${_deliveryLabel(msg)}',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
@@ -1075,4 +1092,3 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 }
-

@@ -53,6 +53,7 @@ class BleService {
   final _telemetryController = StreamController<MeshtasticTelemetry>.broadcast();
   final _metadataController = StreamController<MeshtasticDeviceMetadata>.broadcast();
   final _inboundMessageController = StreamController<MeshtasticInboundMessage>.broadcast();
+  final _ackController = StreamController<MeshtasticAck>.broadcast();
   final _discoveredDevicesController = StreamController<List<DiscoveredRadioDevice>>.broadcast();
 
   BleConnectionState _currentState = BleConnectionState.disconnected;
@@ -65,6 +66,7 @@ class BleService {
   Stream<MeshtasticTelemetry> get telemetryStream => _telemetryController.stream;
   Stream<MeshtasticDeviceMetadata> get metadataStream => _metadataController.stream;
   Stream<MeshtasticInboundMessage> get inboundMessageStream => _inboundMessageController.stream;
+  Stream<MeshtasticAck> get ackStream => _ackController.stream;
   Stream<List<DiscoveredRadioDevice>> get discoveredDevicesStream => _discoveredDevicesController.stream;
 
   BleConnectionState get currentState => _currentState;
@@ -542,6 +544,9 @@ class BleService {
       } else if (decoded is MeshtasticInboundMessage) {
         _logger.loraRx('MENSAJE LORA', '💬 Mensaje recibido de ${decoded.senderName}: "${decoded.text}" [RSSI: ${decoded.rssi ?? "N/A"} dBm | SNR: ${decoded.snr?.toStringAsFixed(1) ?? "N/A"} dB | Saltos: ${decoded.hopStart - decoded.hopLimit}]', hex);
         _inboundMessageController.add(decoded);
+      } else if (decoded is MeshtasticAck) {
+        _logger.info('LORA ACK', 'ACK recibido para packet_id=${decoded.packetId} desde ${decoded.from}.');
+        _ackController.add(decoded);
       } else if (decoded is Map && decoded['type'] == 'config_complete') {
         _logger.info('CONFIG MESH', '✅ Sincronización de configuración completada (Config ID: ${decoded['config_id']})');
       }
@@ -551,7 +556,7 @@ class BleService {
   }
 
   /// Transmite un mensaje de texto por la malla LoRa a través de Meshtastic
-  Future<bool> sendTextMessage(String text, {int toNodeNum = kBroadcastNodeNum}) async {
+  Future<bool> sendTextMessage(String text, {int toNodeNum = kBroadcastNodeNum, required int packetId}) async {
     if (_currentState != BleConnectionState.connected || _toRadioCharacteristic == null) {
       _logger.warn('LORA TX', 'No se puede transmitir: WisBlock desconectado.');
       return false;
@@ -564,6 +569,7 @@ class BleService {
         toNodeNum: toNodeNum,
         channel: 0,
         hopLimit: 3,
+        packetId: packetId,
       );
 
       final hex = packet.map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
@@ -889,6 +895,7 @@ class BleService {
     _telemetryController.close();
     _metadataController.close();
     _inboundMessageController.close();
+    _ackController.close();
     _discoveredDevicesController.close();
   }
 }

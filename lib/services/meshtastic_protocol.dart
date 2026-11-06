@@ -164,6 +164,7 @@ class MeshtasticInboundMessage {
   final int hopLimit;
   final int hopStart;
   final bool isUrgent;
+  final int? packetId;
 
   MeshtasticInboundMessage({
     required this.from,
@@ -177,6 +178,21 @@ class MeshtasticInboundMessage {
     this.hopLimit = 3,
     this.hopStart = 3,
     this.isUrgent = false,
+    this.packetId,
+  });
+}
+
+class MeshtasticAck {
+  final int packetId;
+  final int from;
+  final int to;
+  final bool acknowledged;
+
+  const MeshtasticAck({
+    required this.packetId,
+    required this.from,
+    required this.to,
+    this.acknowledged = true,
   });
 }
 
@@ -452,6 +468,8 @@ class MeshtasticProtocol {
     int hopLimit = 3;
     int hopStart = 3;
     int rxTimeSec = 0;
+    int packetId = 0;
+    int requestId = 0;
 
     while (reader.hasMore) {
       final tag = reader.readTag();
@@ -472,6 +490,8 @@ class MeshtasticProtocol {
             } else if (dTag.fieldNumber == 2) {
               rawPayload = dataReader.readBytes();
               payloadText = utf8.decode(rawPayload, allowMalformed: true);
+            } else if (dTag.fieldNumber == 6) {
+              requestId = dataReader.readFixed32();
             } else {
               dataReader.skipField(dTag.wireType);
             }
@@ -479,6 +499,9 @@ class MeshtasticProtocol {
           break;
         case 7:
           rxTimeSec = reader.readFixed32();
+          break;
+        case 6:
+          packetId = reader.readFixed32();
           break;
         case 8:
           snr = reader.readFloat();
@@ -526,6 +549,28 @@ class MeshtasticProtocol {
         hopLimit: hopLimit,
         hopStart: hopStart,
         isUrgent: isUrgent,
+        packetId: packetId == 0 ? null : packetId,
+      );
+    }
+
+    if (portnum == kPortNumRouting && requestId != 0) {
+      var routingError = 0;
+      if (rawPayload != null) {
+        final routingReader = _ProtobufReader(rawPayload);
+        while (routingReader.hasMore) {
+          final routingTag = routingReader.readTag();
+          if (routingTag.fieldNumber == 3) {
+            routingError = routingReader.readVarint();
+          } else {
+            routingReader.skipField(routingTag.wireType);
+          }
+        }
+      }
+      return MeshtasticAck(
+        packetId: requestId,
+        from: from,
+        to: to,
+        acknowledged: routingError == 0 || routingError == 8,
       );
     }
 
@@ -766,19 +811,17 @@ class MeshtasticProtocol {
   /// Construye un paquete `ToRadio` con un `MeshPacket` de texto para transmitir por la malla LoRa
   static Uint8List buildTextMessagePacket({
     required String text,
+    required int packetId,
     int myNodeNum = 0,
     int toNodeNum = kBroadcastNodeNum,
     int channel = 0,
     int hopLimit = 3,
   }) {
-    final rand = Random();
-    final packetId = rand.nextInt(0x7FFFFFFF);
-
     // 1. Data submessage
     final dataWriter = _ProtobufWriter();
     dataWriter.writeVarintField(1, kPortNumTextMessage); // portnum = TEXT_MESSAGE_APP
     dataWriter.writeBytesField(2, utf8.encode(text));    // payload = UTF-8 text
-    dataWriter.writeVarintField(3, 1);                   // want_response = true
+    dataWriter.writeVarintField(3, 0);                   // want_response = false
     final dataBytes = dataWriter.toBytes();
 
     // 2. MeshPacket submessage

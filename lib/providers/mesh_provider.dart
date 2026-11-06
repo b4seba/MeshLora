@@ -5,6 +5,7 @@ import '../models/chat_message.dart';
 import '../models/neighbor_node.dart';
 import '../models/device_status.dart';
 import '../services/ble_service.dart';
+import '../services/meshtastic_protocol.dart';
 import '../services/radio_logger.dart';
 import '../services/storage_service.dart';
 
@@ -49,9 +50,16 @@ class MeshProvider with ChangeNotifier {
   StreamSubscription? _telemetrySub;
   StreamSubscription? _metadataSub;
   StreamSubscription? _inboundMessageSub;
+  StreamSubscription? _ackSub;
   StreamSubscription? _discoveredDevicesSub;
   Timer? _presenceTickerTimer;
   bool _isDisposed = false;
+  bool _isTransmissionWorkerRunning = false;
+  static int _nextPacketId = 1;
+  final Map<int, Completer<bool>> _pendingAcks = {};
+  static const Duration _transmissionSpacing = Duration(seconds: 1);
+  static const Duration _ackTimeout = Duration(seconds: 8);
+  static const int _maxTransmissionAttempts = 3;
 
   AppFlowScreen get currentScreen => _currentScreen;
   int get currentTab => _currentTab;
@@ -112,7 +120,10 @@ class MeshProvider with ChangeNotifier {
     }
     final savedMessages = await _storageService.getMessages();
     if (savedMessages != null && savedMessages.isNotEmpty) {
-      _messages.addAll(savedMessages);
+      _messages.addAll(savedMessages.map((message) =>
+          message.deliveryState == MessageDeliveryState.transmitting
+              ? message.copyWith(deliveryState: MessageDeliveryState.queued)
+              : message));
     }
     final savedTheme = await _storageService.getThemeMode();
     if (savedTheme == 'light') {
@@ -123,6 +134,7 @@ class MeshProvider with ChangeNotifier {
       _themeMode = ThemeMode.system;
     }
     notifyListeners();
+    _startTransmissionWorker();
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
@@ -158,6 +170,7 @@ class MeshProvider with ChangeNotifier {
           connectedDeviceName: _bleService.connectedDeviceName,
           connectedDeviceId: _bleService.connectedDeviceId,
         );
+        _startTransmissionWorker();
         if (_currentGpsPosition != null) {
           Future.delayed(const Duration(seconds: 2), () => broadcastMyLocation());
         }
@@ -493,6 +506,21 @@ class MeshProvider with ChangeNotifier {
       notifyListeners();
     });
 
+    _ackSub = _bleService.ackStream.listen((ack) {
+      final completer = _pendingAcks.remove(ack.packetId);
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(ack.acknowledged);
+      }
+      final index = _messages.indexWhere((message) => message.packetId == ack.packetId);
+      if (ack.acknowledged && index >= 0) {
+        _messages[index] = _messages[index].copyWith(
+          deliveryState: MessageDeliveryState.acknowledged,
+        );
+        _storageService.saveMessages(_messages);
+        notifyListeners();
+      }
+    });
+
     // 7. Radios Bluetooth detectadas
     _discoveredDevicesSub = _bleService.discoveredDevicesStream.listen((devices) {
       _discoveredDevices = devices;
@@ -656,12 +684,9 @@ class MeshProvider with ChangeNotifier {
       return;
     }
 
-    // 1. Transmitir por la malla LoRa real a través de Meshtastic BLE
-    await _bleService.sendTextMessage(cleanText);
-
-    // 2. Registrar en la interfaz local
+    final packetId = _allocatePacketId();
     final newMsg = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      id: 'msg_$packetId',
       senderNodeNum: _bleService.myNodeNum,
       name: 'Yo ($_userName)',
       initials: userInitials,
@@ -670,15 +695,99 @@ class MeshProvider with ChangeNotifier {
       fromMe: true,
       avatarColor: const Color(0xFF0A1F44),
       isUrgent: isUrgent || cleanText.toUpperCase().contains('AYUDA') || cleanText.toUpperCase().contains('SOS'),
+      deliveryState: MessageDeliveryState.queued,
+      packetId: packetId,
+      destinationNodeNum: kBroadcastNodeNum,
     );
 
     _messages.add(newMsg);
-    _deviceStatus = _deviceStatus.copyWith(
-      totalMessagesTransmitted: _deviceStatus.totalMessagesTransmitted + 1,
-    );
-
     await _storageService.saveMessages(_messages);
     notifyListeners();
+    _startTransmissionWorker();
+  }
+
+  int _allocatePacketId() {
+    final timestampId = DateTime.now().microsecondsSinceEpoch & 0x7FFFFFFF;
+    if (timestampId >= _nextPacketId) _nextPacketId = timestampId + 1;
+    if (_nextPacketId > 0x7FFFFFFF) _nextPacketId = 1;
+    return _nextPacketId++;
+  }
+
+  void _startTransmissionWorker() {
+    if (_isTransmissionWorkerRunning || _isDisposed) return;
+    _isTransmissionWorkerRunning = true;
+    _runTransmissionWorker();
+  }
+
+  Future<void> _runTransmissionWorker() async {
+    try {
+      while (!_isDisposed) {
+        final pending = _messages.where((message) =>
+            message.fromMe &&
+            (message.deliveryState == MessageDeliveryState.queued ||
+                (message.deliveryState == MessageDeliveryState.unconfirmed &&
+                    message.attempts < _maxTransmissionAttempts))).toList()
+          ..sort((a, b) {
+            if (a.isUrgent != b.isUrgent) return a.isUrgent ? -1 : 1;
+            return a.timestamp.compareTo(b.timestamp);
+          });
+        if (pending.isEmpty || !_bleService.isConnected) return;
+
+        final message = pending.first;
+        final index = _messages.indexOf(message);
+        if (index < 0) continue;
+        _messages[index] = message.copyWith(
+          deliveryState: MessageDeliveryState.transmitting,
+          attempts: message.attempts + 1,
+        );
+        await _storageService.saveMessages(_messages);
+        notifyListeners();
+
+        final attempt = message.attempts + 1;
+        final ackCompleter = Completer<bool>();
+        _pendingAcks[message.packetId!] = ackCompleter;
+        final sent = await _bleService.sendTextMessage(
+          message.text,
+          packetId: message.packetId!,
+          toNodeNum: message.destinationNodeNum ?? kBroadcastNodeNum,
+        );
+        final acknowledged = sent
+            ? await ackCompleter.future.timeout(_ackTimeout, onTimeout: () => false)
+            : false;
+        _pendingAcks.remove(message.packetId);
+
+        final currentIndex = _messages.indexWhere((item) => item.id == message.id);
+        if (currentIndex >= 0) {
+          _messages[currentIndex] = _messages[currentIndex].copyWith(
+            deliveryState: acknowledged
+                ? MessageDeliveryState.acknowledged
+                : (attempt >= _maxTransmissionAttempts
+                    ? MessageDeliveryState.unconfirmed
+                    : MessageDeliveryState.queued),
+          );
+          if (acknowledged) {
+            _deviceStatus = _deviceStatus.copyWith(
+              totalMessagesTransmitted: _deviceStatus.totalMessagesTransmitted + 1,
+            );
+          }
+          await _storageService.saveMessages(_messages);
+          notifyListeners();
+        }
+        if (!acknowledged && attempt >= _maxTransmissionAttempts) continue;
+        await Future.delayed(_transmissionSpacing);
+      }
+    } finally {
+      _isTransmissionWorkerRunning = false;
+      if (!_isDisposed &&
+          _bleService.isConnected &&
+          _messages.any((message) =>
+              message.fromMe &&
+              (message.deliveryState == MessageDeliveryState.queued ||
+                  (message.deliveryState == MessageDeliveryState.unconfirmed &&
+                      message.attempts < _maxTransmissionAttempts)))) {
+        _startTransmissionWorker();
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1209,6 +1318,7 @@ class MeshProvider with ChangeNotifier {
     _telemetrySub?.cancel();
     _metadataSub?.cancel();
     _inboundMessageSub?.cancel();
+    _ackSub?.cancel();
     _discoveredDevicesSub?.cancel();
     _bleService.dispose();
     super.dispose();
