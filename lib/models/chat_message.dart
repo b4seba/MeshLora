@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+enum MessageDeliveryState { created, queued, transmitting, acknowledged, failed, unconfirmed }
+
 class ChatMessage {
   final String id;
   final int senderNodeNum;
@@ -13,6 +15,10 @@ class ChatMessage {
   final int? rssiDbm;
   final double? snr;
   final int hops;
+  final MessageDeliveryState deliveryState;
+  final int? packetId;
+  final int attempts;
+  final int? destinationNodeNum;
 
   ChatMessage({
     required this.id,
@@ -27,12 +33,37 @@ class ChatMessage {
     this.rssiDbm,
     this.snr,
     this.hops = 0,
+    this.deliveryState = MessageDeliveryState.acknowledged,
+    this.packetId,
+    this.attempts = 0,
+    this.destinationNodeNum,
   });
 
   String get formattedTime {
     final hour = timestamp.hour.toString().padLeft(2, '0');
     final minute = timestamp.minute.toString().padLeft(2, '0');
     return '$hour:$minute';
+  }
+
+  ChatMessage copyWith({MessageDeliveryState? deliveryState, int? attempts}) {
+    return ChatMessage(
+      id: id,
+      senderNodeNum: senderNodeNum,
+      name: name,
+      initials: initials,
+      text: text,
+      timestamp: timestamp,
+      fromMe: fromMe,
+      avatarColor: avatarColor,
+      isUrgent: isUrgent,
+      rssiDbm: rssiDbm,
+      snr: snr,
+      hops: hops,
+      deliveryState: deliveryState ?? this.deliveryState,
+      packetId: packetId,
+      attempts: attempts ?? this.attempts,
+      destinationNodeNum: destinationNodeNum,
+    );
   }
 
   Map<String, dynamic> toJson() {
@@ -49,6 +80,10 @@ class ChatMessage {
       'rssiDbm': rssiDbm,
       'snr': snr,
       'hops': hops,
+      'deliveryState': deliveryState.name,
+      'packetId': packetId,
+      'attempts': attempts,
+      'destinationNodeNum': destinationNodeNum,
     };
   }
 
@@ -66,6 +101,13 @@ class ChatMessage {
       rssiDbm: json['rssiDbm'] as int?,
       snr: (json['snr'] as num?)?.toDouble(),
       hops: json['hops'] as int? ?? 0,
+      deliveryState: MessageDeliveryState.values.firstWhere(
+        (state) => state.name == json['deliveryState'],
+        orElse: () => MessageDeliveryState.acknowledged,
+      ),
+      packetId: json['packetId'] as int?,
+      attempts: json['attempts'] as int? ?? 0,
+      destinationNodeNum: json['destinationNodeNum'] as int?,
     );
   }
 }

@@ -7,6 +7,7 @@ class StorageService {
   static const String _kMessages = 'radio_mesh_messages';
   static const String _kIsPaired = 'radio_mesh_is_paired';
   static const String _kLastDeviceId = 'radio_mesh_last_device_id';
+  Future<void> _messageWriteChain = Future<void>.value();
 
   Future<void> saveUserName(String name) async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,9 +40,12 @@ class StorageService {
   }
 
   Future<void> saveMessages(List<ChatMessage> messages) async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonList = messages.map((m) => m.toJson()).toList();
-    await prefs.setString(_kMessages, jsonEncode(jsonList));
+    final snapshot = messages.map((m) => m.toJson()).toList();
+    _messageWriteChain = _messageWriteChain.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kMessages, jsonEncode(snapshot));
+    });
+    await _messageWriteChain;
   }
 
   Future<List<ChatMessage>?> getMessages() async {
